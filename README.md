@@ -7,6 +7,7 @@
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%26%20Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Security](https://img.shields.io/badge/Security-Air--Gapped%20(Zero%20Internet)-critical?style=for-the-badge&logo=shield)](https://github.com/Max000110/upi-soundbox)
+[![Download APK](https://img.shields.io/github/v/release/Max000110/upi-soundbox?color=orange&label=Download%20APK&logo=android&style=for-the-badge)](https://github.com/Max000110/upi-soundbox/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.style=for-the-badge)](LICENSE)
 
 <br/>
