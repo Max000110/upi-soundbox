@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Log
 import com.upisoundbox.core.model.TtsStatus
 import com.upisoundbox.domain.model.SpeechRequest
@@ -69,7 +70,6 @@ class AndroidTtsEngine(
             initDeferred = CompletableDeferred()
             Log.i("UpiSoundbox", ">>> Initializing TextToSpeech engine (Attempt ${retryCount + 1})...")
 
-            // Prefer Google TTS engine for maximum stability and speed
             val preferredEngine = getBestTtsEngine()
             tts = if (preferredEngine != null) {
                 Log.d("UpiSoundbox", "Binding to preferred engine: $preferredEngine")
@@ -78,7 +78,6 @@ class AndroidTtsEngine(
                 TextToSpeech(context.applicationContext, this)
             }
 
-            // Launch watchdog timeout (7 seconds)
             scope.launch {
                 delay(7000L)
                 if (_status.value == TtsStatus.INITIALIZING) {
@@ -161,7 +160,6 @@ class AndroidTtsEngine(
     }
 
     override suspend fun speak(request: SpeechRequest): Boolean {
-        // Await readiness with timeout
         val ready = if (initDeferred.isCompleted) {
             @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
             initDeferred.getCompleted()
@@ -188,17 +186,19 @@ class AndroidTtsEngine(
             Log.w("UpiSoundbox", "Could not set audio attributes on TTS engine", e)
         }
 
-        // Configure language
-        val locale = if (request.language.equals("hi", ignoreCase = true)) {
+        val targetLocale = if (request.language.equals("hi", ignoreCase = true)) {
             Locale("hi", "IN")
         } else {
             Locale("en", "IN")
         }
 
-        val langResult = engine.setLanguage(locale)
+        val langResult = engine.setLanguage(targetLocale)
         if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w("UpiSoundbox", "Language $locale not supported, falling back to English")
+            Log.w("UpiSoundbox", "Language $targetLocale not supported, falling back to default English")
             engine.language = Locale.ENGLISH
+        } else {
+            // Apply high quality Indian acoustic voice profile if available
+            selectBestVoice(engine, targetLocale)
         }
 
         engine.setSpeechRate(request.speechRate.coerceIn(0.5f, 2.0f))
@@ -207,7 +207,6 @@ class AndroidTtsEngine(
         val utteranceId = request.id
         val completionDeferred = CompletableDeferred<Boolean>()
 
-        // Request transient audio focus to pause background playback cleanly for the announcement
         var focusRequest: AudioFocusRequest? = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioManager != null) {
             val playbackAttributes = AudioAttributes.Builder()
@@ -215,13 +214,13 @@ class AndroidTtsEngine(
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build()
 
-            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(playbackAttributes)
                 .setAcceptsDelayedFocusGain(false)
                 .build()
 
             val focusResult = audioManager.requestAudioFocus(focusRequest)
-            Log.d("UpiSoundbox", "Audio focus requested: result=$focusResult")
+            Log.d("UpiSoundbox", "Audio focus requested (ducking enabled): result=$focusResult")
         }
 
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -283,6 +282,25 @@ class AndroidTtsEngine(
             Log.w("UpiSoundbox", "TTS speech timed out after 15s")
             abandonFocus(focusRequest)
             false
+        }
+    }
+
+    private fun selectBestVoice(engine: TextToSpeech, targetLocale: Locale) {
+        try {
+            val availableVoices = engine.voices ?: return
+            val matchingVoices = availableVoices.filter {
+                it.locale.language.equals(targetLocale.language, ignoreCase = true) &&
+                        !it.isNetworkConnectionRequired
+            }
+
+            if (matchingVoices.isNotEmpty()) {
+                val selectedVoice = matchingVoices.firstOrNull { it.name.contains("local", ignoreCase = true) }
+                    ?: matchingVoices.first()
+                engine.voice = selectedVoice
+                Log.d("UpiSoundbox", "Applied high-quality acoustic voice: ${selectedVoice.name} (locale=${selectedVoice.locale})")
+            }
+        } catch (e: Exception) {
+            Log.w("UpiSoundbox", "Could not query or apply custom voice profile", e)
         }
     }
 
