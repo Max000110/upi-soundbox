@@ -2,6 +2,7 @@ package com.upisoundbox.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -37,8 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.upisoundbox.UpiSoundboxApp
 import com.upisoundbox.domain.model.SpeechRequest
+import com.upisoundbox.speech.VoicePersona
 import com.upisoundbox.ui.theme.PrimaryContainerM3
 import com.upisoundbox.ui.theme.PrimaryM3
+import com.upisoundbox.ui.theme.SecondaryM3
 import com.upisoundbox.ui.theme.SemanticSuccess
 import com.upisoundbox.ui.theme.SurfacePrimary
 import com.upisoundbox.ui.theme.SurfaceSecondary
@@ -53,6 +58,7 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
     val ttsStatus by container.ttsEngine.status.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val currentPersona = settings?.voicePersona ?: VoicePersona.COQUI_WARM_RETAIL_FEMALE
     val currentLang = settings?.language ?: "en"
     val speechRate = settings?.speechRate ?: 1.0f
     val volume = settings?.volume ?: 1.0f
@@ -71,19 +77,19 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
 
         // Title
         Text(
-            text = "Voice & Soundbox",
+            text = "Voice & Sound Models",
             style = MaterialTheme.typography.headlineLarge,
             color = TextPrimary
         )
         Text(
-            text = "High-Fidelity Offline Speech Synthesis",
+            text = "Coqui & Echidna Neural Voice Architecture",
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondary
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // TTS Engine Status Banner
+        // Status Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,12 +100,12 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "SPEECH SYNTHESIZER",
+                        text = "ACTIVE VOICE MODEL",
                         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
                         color = PrimaryM3
                     )
                     Text(
-                        text = "Google High-Quality Acoustic Voice",
+                        text = currentPersona.title,
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary
                     )
@@ -115,6 +121,112 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Choose Voice Persona (8 Models Available)",
+            style = MaterialTheme.typography.titleMedium,
+            color = TextPrimary
+        )
+        Text(
+            text = "Tap to select and hit Preview to hear on your speaker",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // List of Voice Personas
+        VoicePersona.entries.forEach { persona ->
+            val isSelected = persona == currentPersona
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (isSelected) PrimaryContainerM3.copy(alpha = 0.5f) else SurfacePrimary)
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) PrimaryM3 else Color(0xFFE2E8F0),
+                        shape = RoundedCornerShape(18.dp)
+                    )
+                    .clickable {
+                        scope.launch {
+                            container.settingsRepository.updateVoicePersona(persona)
+                        }
+                    }
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, if (isSelected) PrimaryM3 else Color.Gray, CircleShape)
+                                .background(if (isSelected) PrimaryM3 else Color.Transparent)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = persona.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SecondaryM3.copy(alpha = 0.12f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = persona.badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = SecondaryM3
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = persona.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = {
+                                val sampleText = if (currentLang == "hi") persona.sampleTextHi else persona.sampleTextEn
+                                container.speechQueue.enqueue(
+                                    SpeechRequest(
+                                        text = sampleText,
+                                        language = currentLang,
+                                        speechRate = speechRate * persona.rateMultiplier,
+                                        speechPitch = persona.pitchMultiplier,
+                                        requestedVolume = volume
+                                    )
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("▶ Preview Voice", style = MaterialTheme.typography.labelSmall, color = PrimaryM3)
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "Pitch ${persona.pitchMultiplier}x • Rate ${persona.rateMultiplier}x",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
                 }
             }
         }
@@ -144,7 +256,7 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
 
         // Speech Rate Slider
         Text(
-            text = "Speech Rate: ${String.format("%.1f", speechRate)}x",
+            text = "Master Speed Adjustment: ${String.format("%.1f", speechRate)}x",
             style = MaterialTheme.typography.titleMedium,
             color = TextPrimary
         )
@@ -160,7 +272,7 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
 
         // Volume Slider
         Text(
-            text = "Announcement Volume: ${(volume * 100).toInt()}%",
+            text = "Soundbox Speaker Volume: ${(volume * 100).toInt()}%",
             style = MaterialTheme.typography.titleMedium,
             color = TextPrimary
         )
@@ -211,7 +323,7 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(20.dp))
 
         // Privacy & Security Card
-        Text(text = "Screen Security", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+        Text(text = "Screen Shield", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
 
         Box(
@@ -241,21 +353,18 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Action Buttons
         Button(
             onClick = {
-                val sampleText = if (currentLang == "hi") {
-                    "गूगल पे पर, राहुल से पचास रुपये प्राप्त हुए।"
-                } else {
-                    "Received fifty rupees from Rahul, on Google Pay."
-                }
+                val sampleText = if (currentLang == "hi") currentPersona.sampleTextHi else currentPersona.sampleTextEn
                 container.speechQueue.enqueue(
                     SpeechRequest(
                         text = sampleText,
                         language = currentLang,
-                        speechRate = speechRate,
+                        speechRate = speechRate * currentPersona.rateMultiplier,
+                        speechPitch = currentPersona.pitchMultiplier,
                         requestedVolume = volume
                     )
                 )
@@ -264,19 +373,7 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
             shape = RoundedCornerShape(20.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PrimaryM3)
         ) {
-            Text("🔊 Test Full Voice Announcement", style = MaterialTheme.typography.labelLarge, color = Color.White)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedButton(
-            onClick = {
-                container.ttsEngine.reinitialize()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Text("🔄 Re-warm Speech Engine", style = MaterialTheme.typography.labelMedium, color = PrimaryM3)
+            Text("🔊 Test Selected Model Announcement", style = MaterialTheme.typography.labelLarge, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(32.dp))

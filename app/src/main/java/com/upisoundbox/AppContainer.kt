@@ -95,12 +95,13 @@ class AppContainer(val context: Context) {
                         )
                         Log.i("UpiSoundbox", "Announcement formatted: '$announcementText'")
 
-                        // 7. Enqueue speech
+                        // 7. Enqueue speech with selected VoicePersona modulation
+                        val persona = currentSettings.voicePersona
                         val speechRequest = SpeechRequest(
                             text = announcementText,
                             language = currentSettings.language,
-                            speechRate = currentSettings.speechRate,
-                            speechPitch = currentSettings.speechPitch,
+                            speechRate = currentSettings.speechRate * persona.rateMultiplier,
+                            speechPitch = currentSettings.speechPitch * persona.pitchMultiplier,
                             requestedVolume = currentSettings.volume,
                             boostVolume = currentSettings.temporaryVolumeBoost
                         )

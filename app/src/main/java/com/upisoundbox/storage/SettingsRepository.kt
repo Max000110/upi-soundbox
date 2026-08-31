@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.upisoundbox.core.model.Provider
 import com.upisoundbox.domain.model.UserSettings
+import com.upisoundbox.speech.VoicePersona
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -31,6 +32,7 @@ class SettingsRepository(private val context: Context) {
         val ENABLED_PROVIDERS = stringSetPreferencesKey("enabled_providers")
         val HISTORY_ENABLED = booleanPreferencesKey("history_enabled")
         val SECURE_SCREEN = booleanPreferencesKey("secure_screen")
+        val VOICE_PERSONA_ID = stringPreferencesKey("voice_persona_id")
     }
 
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -46,8 +48,13 @@ class SettingsRepository(private val context: Context) {
             deduplicationWindowSeconds = prefs[Keys.DEDUP_WINDOW_SECONDS] ?: 60,
             enabledProviders = prefs[Keys.ENABLED_PROVIDERS] ?: defaultProviders,
             isHistoryEnabled = prefs[Keys.HISTORY_ENABLED] ?: true,
-            isSecureScreenEnabled = prefs[Keys.SECURE_SCREEN] ?: true
+            isSecureScreenEnabled = prefs[Keys.SECURE_SCREEN] ?: true,
+            voicePersona = VoicePersona.fromId(prefs[Keys.VOICE_PERSONA_ID])
         )
+    }
+
+    suspend fun updateVoicePersona(persona: VoicePersona) {
+        context.dataStore.edit { it[Keys.VOICE_PERSONA_ID] = persona.id }
     }
 
     suspend fun updateLanguage(lang: String) {
