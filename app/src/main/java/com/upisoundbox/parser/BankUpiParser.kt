@@ -9,16 +9,24 @@ import com.upisoundbox.validation.PaymentValidator
 class BankUpiParser : PaymentNotificationParser {
     override val provider: Provider = Provider.GENERIC
 
-    private val BANK_SMS_PACKAGES = setOf(
-        "com.google.android.apps.messaging",
-        "com.samsung.android.messaging",
-        "com.android.mms",
-        "com.kotak811mobilebankingapp.instantsavingsupiscanandpayrecharge",
-        "com.snapwork.hdfc",
-        "com.csam.icici.bank.imobile",
-        "com.sbi.lotusintouch",
-        "com.axis.mobile"
-    )
+    companion object {
+        private val BANK_SMS_PACKAGES = setOf(
+            "com.google.android.apps.messaging",
+            "com.samsung.android.messaging",
+            "com.android.mms",
+            "com.kotak811mobilebankingapp.instantsavingsupiscanandpayrecharge",
+            "com.snapwork.hdfc",
+            "com.csam.icici.bank.imobile",
+            "com.sbi.lotusintouch",
+            "com.axis.mobile"
+        )
+
+        private val REGEX_FROM = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*\\(|\\s*on\\s+\\d|\\s*to\\s+XX|\\s*ref|\\.|$)")
+        private val REGEX_REFERENCE = Regex("(?i)(?:upi\\s*ref|rrn|txn|ref)[:\\s]*([0-9A-Za-z]{6,25})")
+        private val REGEX_QUOTES = Regex("(?i)[“”\"']")
+        private val REGEX_NON_ALPHANUM = Regex("[^A-Za-z0-9\\s]")
+        private val REGEX_WHITESPACE = Regex("\\s+")
+    }
 
     override fun supports(packageName: String): Boolean {
         return BANK_SMS_PACKAGES.contains(packageName)
@@ -69,8 +77,7 @@ class BankUpiParser : PaymentNotificationParser {
         )
 
         for (t in candidates) {
-            // Pattern 1: "received from <Payer>" or "from <Payer> on"
-            val fromMatch = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*\\(|\\s*on\\s+\\d|\\s*to\\s+XX|\\s*ref|\\.|$)").find(t)
+            val fromMatch = REGEX_FROM.find(t)
             if (fromMatch != null) {
                 val candidate = cleanPayerName(fromMatch.groupValues[1])
                 if (candidate.isNotEmpty() && !candidate.equals("your", ignoreCase = true)) {
@@ -82,14 +89,14 @@ class BankUpiParser : PaymentNotificationParser {
     }
 
     private fun extractReference(text: String): String? {
-        val match = Regex("(?i)(?:upi\\s*ref|rrn|txn|ref)[:\\s]*([0-9A-Za-z]{6,25})").find(text)
+        val match = REGEX_REFERENCE.find(text)
         return match?.groupValues?.get(1)
     }
 
     private fun cleanPayerName(raw: String): String {
-        return raw.replace(Regex("(?i)[“”\"']"), "")
-            .replace(Regex("[^A-Za-z0-9\\s]"), " ")
-            .replace(Regex("\\s+"), " ")
+        return raw.replace(REGEX_QUOTES, "")
+            .replace(REGEX_NON_ALPHANUM, " ")
+            .replace(REGEX_WHITESPACE, " ")
             .trim()
     }
 }

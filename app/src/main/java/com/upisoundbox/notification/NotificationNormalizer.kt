@@ -15,10 +15,14 @@ object NotificationNormalizer {
         '५' to '5', '६' to '6', '७' to '7', '८' to '8', '९' to '9'
     )
 
+    private val REGEX_NEWLINES = Regex("[\\r\\n\\t]+")
+    private val REGEX_CURRENCY_MARKERS = Regex("(?i)\\b(rs\\.?|inr)\\b")
+    private val REGEX_COLLAPSE_WHITESPACES = Regex("\\s+")
+
     fun normalize(raw: RawNotification): NormalizedNotification {
         val combined = raw.fullText()
 
-        // 1. Normalize Unicode whitespace & non-breaking spaces
+        // 1. Fast char replacement for common Unicode spaces & curly quotes
         var text = combined
             .replace('\u00A0', ' ')
             .replace('\u2007', ' ')
@@ -28,7 +32,7 @@ object NotificationNormalizer {
             .replace('”', '"')
             .replace('‘', '\'')
             .replace('’', '\'')
-            .replace(Regex("[\\r\\n\\t]+"), " ")
+            .replace(REGEX_NEWLINES, " ")
 
         // 2. Convert Indic/Devanagari digits to standard ASCII digits
         val digitConverted = StringBuilder(text.length)
@@ -39,10 +43,10 @@ object NotificationNormalizer {
         text = digitConverted.toString()
 
         // 3. Normalize currency markers: "Rs.", "Rs", "INR", "inr" -> "₹"
-        text = text.replace(Regex("(?i)\\b(rs\\.?|inr)\\b"), "₹")
+        text = text.replace(REGEX_CURRENCY_MARKERS, "₹")
 
         // 4. Collapse repeated whitespaces
-        text = text.replace(Regex("\\s+"), " ").trim()
+        text = text.replace(REGEX_COLLAPSE_WHITESPACES, " ").trim()
 
         val lowercase = text.lowercase()
 

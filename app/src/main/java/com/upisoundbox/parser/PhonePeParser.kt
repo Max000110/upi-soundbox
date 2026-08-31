@@ -9,6 +9,11 @@ import com.upisoundbox.validation.PaymentValidator
 class PhonePeParser : PaymentNotificationParser {
     override val provider: Provider = Provider.PHONEPE
 
+    companion object {
+        private val REGEX_FROM = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*\\(|\\s*via|\\s*on|\\s*ref|\\s*upi|$)")
+        private val REGEX_REFERENCE = Regex("(?i)(?:ref|rrn|txn|upi\\s*ref)[:\\s]*([0-9A-Za-z]{6,25})")
+    }
+
     override fun supports(packageName: String): Boolean {
         return provider.defaultPackageIds.contains(packageName)
     }
@@ -27,7 +32,6 @@ class PhonePeParser : PaymentNotificationParser {
         val amountMinor = AmountParser.extractAmountMinor(text)
             ?: return ParseResult.Failed("Could not extract valid monetary amount from PhonePe notification")
 
-        // Optional payer extraction: "from <Payer>"
         val payerName = extractPayer(text)
         val ref = extractReference(text)
 
@@ -48,12 +52,12 @@ class PhonePeParser : PaymentNotificationParser {
     }
 
     private fun extractPayer(text: String): String? {
-        val match = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*\\(|\\s*via|\\s*on|\\s*ref|\\s*upi|$)").find(text)
+        val match = REGEX_FROM.find(text)
         return match?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() && !it.equals("you", ignoreCase = true) }
     }
 
     private fun extractReference(text: String): String? {
-        val match = Regex("(?i)(?:ref|rrn|txn|upi\\s*ref)[:\\s]*([0-9A-Za-z]{6,25})").find(text)
+        val match = REGEX_REFERENCE.find(text)
         return match?.groupValues?.get(1)
     }
 }

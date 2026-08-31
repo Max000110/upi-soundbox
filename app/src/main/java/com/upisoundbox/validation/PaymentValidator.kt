@@ -4,7 +4,7 @@ import com.upisoundbox.core.model.Direction
 
 object PaymentValidator {
 
-    private val REJECT_KEYWORDS = listOf(
+    private val REJECT_KEYWORDS = arrayOf(
         "otp",
         "verification code",
         "do not share",
@@ -20,7 +20,7 @@ object PaymentValidator {
         "approve request"
     )
 
-    private val CREDIT_PATTERNS = listOf(
+    private val CREDIT_PATTERNS = arrayOf(
         Regex("(?i)\\bpaid\\s+you\\b"),
         Regex("(?i)\\bpaid\\s+to\\s+you\\b"),
         Regex("(?i)\\bsent\\s+you\\b"),
@@ -33,7 +33,7 @@ object PaymentValidator {
         Regex("(?i)\\bupi\\s+credited\\b")
     )
 
-    private val DEBIT_PATTERNS = listOf(
+    private val DEBIT_PATTERNS = arrayOf(
         Regex("(?i)\\byou\\s+paid\\b"),
         Regex("(?i)\\bpaid\\s+to\\b"),
         Regex("(?i)\\bpaid\\b.*\\bfor\\b"),
@@ -77,6 +77,9 @@ object PaymentValidator {
     }
 
     fun isNonPaymentOrPromotion(lowercaseText: String): Boolean {
-        return REJECT_KEYWORDS.any { lowercaseText.contains(it) }
+        for (kw in REJECT_KEYWORDS) {
+            if (lowercaseText.contains(kw)) return true
+        }
+        return false
     }
 }

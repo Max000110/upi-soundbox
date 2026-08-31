@@ -9,6 +9,11 @@ import com.upisoundbox.validation.PaymentValidator
 class PaytmParser : PaymentNotificationParser {
     override val provider: Provider = Provider.PAYTM
 
+    companion object {
+        private val REGEX_FROM = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*in|\\s*to|\\s*ref|\\s*upi|$)")
+        private val REGEX_REFERENCE = Regex("(?i)(?:upi\\s*ref|txn|ref|order)[:\\s]*([0-9A-Za-z]{6,25})")
+    }
+
     override fun supports(packageName: String): Boolean {
         return provider.defaultPackageIds.contains(packageName)
     }
@@ -45,12 +50,12 @@ class PaytmParser : PaymentNotificationParser {
     }
 
     private fun extractPayer(text: String): String? {
-        val fromMatch = Regex("(?i)\\bfrom\\s+([A-Za-z0-9\\s]{2,30}?)(?:\\s*in|\\s*to|\\s*ref|\\s*upi|$)").find(text)
+        val fromMatch = REGEX_FROM.find(text)
         return fromMatch?.groupValues?.get(1)?.trim()
     }
 
     private fun extractReference(text: String): String? {
-        val match = Regex("(?i)(?:upi\\s*ref|txn|ref|order)[:\\s]*([0-9A-Za-z]{6,25})").find(text)
+        val match = REGEX_REFERENCE.find(text)
         return match?.groupValues?.get(1)
     }
 }

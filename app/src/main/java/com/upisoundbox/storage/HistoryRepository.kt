@@ -5,14 +5,20 @@ import android.util.Log
 import com.upisoundbox.core.model.Direction
 import com.upisoundbox.core.model.Provider
 import com.upisoundbox.domain.model.PaymentEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
-class HistoryRepository(private val context: Context) {
+class HistoryRepository(
+    private val context: Context,
+    private val ioScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+) {
 
     private val prefs = context.getSharedPreferences("upi_payment_history_store", Context.MODE_PRIVATE)
     private val keyHistoryJson = "payment_history_json_v1"
@@ -25,7 +31,6 @@ class HistoryRepository(private val context: Context) {
     private fun loadPersistedHistory(): List<PaymentEvent> {
         val jsonStr = prefs.getString(keyHistoryJson, null)
         if (jsonStr.isNullOrBlank()) {
-            // Restore initial history baseline
             val initialEvent = PaymentEvent(
                 sourcePackage = "com.google.android.apps.nbu.paisa.user",
                 provider = Provider.GOOGLE_PAY,
@@ -39,7 +44,7 @@ class HistoryRepository(private val context: Context) {
                 rawSnippet = "AFZAL KASAM MANSURI paid you ₹1.00"
             )
             val initialList = listOf(initialEvent)
-            saveToDisk(initialList)
+            saveToDiskAsync(initialList)
             return initialList
         }
 
@@ -70,28 +75,29 @@ class HistoryRepository(private val context: Context) {
         }
     }
 
-    private fun saveToDisk(events: List<PaymentEvent>) {
-        try {
-            val array = JSONArray()
-            for (event in events) {
-                val obj = JSONObject().apply {
-                    put("sourcePackage", event.sourcePackage)
-                    put("provider", event.provider.name)
-                    put("direction", event.direction.name)
-                    put("amountMinor", event.amountMinor)
-                    put("payerName", event.payerName)
-                    put("transactionReference", event.transactionReference)
-                    put("eventTime", event.eventTime)
-                    put("sourceNotificationKey", event.sourceNotificationKey)
-                    put("confidence", event.confidence.toDouble())
-                    put("rawSnippet", event.rawSnippet)
+    private fun saveToDiskAsync(events: List<PaymentEvent>) {
+        ioScope.launch {
+            try {
+                val array = JSONArray()
+                for (event in events) {
+                    val obj = JSONObject().apply {
+                        put("sourcePackage", event.sourcePackage)
+                        put("provider", event.provider.name)
+                        put("direction", event.direction.name)
+                        put("amountMinor", event.amountMinor)
+                        put("payerName", event.payerName)
+                        put("transactionReference", event.transactionReference)
+                        put("eventTime", event.eventTime)
+                        put("sourceNotificationKey", event.sourceNotificationKey)
+                        put("confidence", event.confidence.toDouble())
+                        put("rawSnippet", event.rawSnippet)
+                    }
+                    array.put(obj)
                 }
-                array.put(obj)
+                prefs.edit().putString(keyHistoryJson, array.toString()).apply()
+            } catch (e: Exception) {
+                Log.e("UpiSoundbox", "Error saving payment history to disk", e)
             }
-            prefs.edit().putString(keyHistoryJson, array.toString()).apply()
-            Log.d("UpiSoundbox", "Saved ${events.size} payment events to disk")
-        } catch (e: Exception) {
-            Log.e("UpiSoundbox", "Error saving payment history to disk", e)
         }
     }
 
@@ -103,14 +109,16 @@ class HistoryRepository(private val context: Context) {
                 current.removeAt(current.lastIndex)
             }
             _history.value = current
-            saveToDisk(current)
+            saveToDiskAsync(current)
         }
     }
 
     fun clearHistory() {
         synchronized(lock) {
             _history.value = emptyList()
-            prefs.edit().remove(keyHistoryJson).apply()
+            ioScope.launch {
+                prefs.edit().remove(keyHistoryJson).apply()
+            }
         }
     }
 

@@ -173,7 +173,10 @@ fun HomeScreen(
             )
         } else {
             LazyColumn {
-                items(history) { event ->
+                items(
+                    items = history,
+                    key = { it.sourceNotificationKey + "_" + it.eventTime }
+                ) { event ->
                     val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(event.eventTime))
                     Box(
                         modifier = Modifier
