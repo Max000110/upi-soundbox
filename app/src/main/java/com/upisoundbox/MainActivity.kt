@@ -16,6 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -25,15 +28,24 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.upisoundbox.security.SecurityManager
+import com.upisoundbox.ui.designvariants.DesignSelectorDialog
+import com.upisoundbox.ui.designvariants.DesignVariant
+import com.upisoundbox.ui.designvariants.DesignVariantTheme
+import com.upisoundbox.ui.designvariants.variants.Design01BankingScreen
+import com.upisoundbox.ui.designvariants.variants.Design02MinimalScreen
+import com.upisoundbox.ui.designvariants.variants.Design03EditorialScreen
+import com.upisoundbox.ui.designvariants.variants.Design04DenseScreen
+import com.upisoundbox.ui.designvariants.variants.Design05Material3Screen
+import com.upisoundbox.ui.designvariants.variants.Design06SoftPremiumScreen
+import com.upisoundbox.ui.designvariants.variants.Design07MonochromeScreen
+import com.upisoundbox.ui.designvariants.variants.Design08LargeTypeScreen
+import com.upisoundbox.ui.designvariants.variants.Design09CompactToolScreen
+import com.upisoundbox.ui.designvariants.variants.Design10NeoGlassScreen
 import com.upisoundbox.ui.navigation.Screen
 import com.upisoundbox.ui.screens.DiagnosticsScreen
 import com.upisoundbox.ui.screens.HistoryScreen
-import com.upisoundbox.ui.screens.HomeScreen
 import com.upisoundbox.ui.screens.ProvidersScreen
 import com.upisoundbox.ui.screens.VoiceScreen
-import com.upisoundbox.ui.theme.AccentEvergreen
-import com.upisoundbox.ui.theme.SurfacePrimary
-import com.upisoundbox.ui.theme.TextSecondary
 import com.upisoundbox.ui.theme.UpiSoundboxTheme
 
 class MainActivity : ComponentActivity() {
@@ -62,6 +74,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
+    var selectedVariant by remember { mutableStateOf(DesignVariant.DESIGN_01) }
+    var showDesignSelector by remember { mutableStateOf(false) }
+
+    val currentPalette = DesignVariantTheme.getPalette(selectedVariant)
+
     val screens = listOf(
         Screen.Home,
         Screen.Providers,
@@ -70,6 +87,17 @@ fun MainApp() {
         Screen.Diagnostics
     )
 
+    if (showDesignSelector) {
+        DesignSelectorDialog(
+            currentVariant = selectedVariant,
+            onSelectVariant = {
+                selectedVariant = it
+                showDesignSelector = false
+            },
+            onDismiss = { showDesignSelector = false }
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -77,7 +105,7 @@ fun MainApp() {
             val currentRoute = navBackStackEntry?.destination?.route
 
             NavigationBar(
-                containerColor = SurfacePrimary
+                containerColor = currentPalette.surface
             ) {
                 screens.forEach { screen ->
                     NavigationBarItem(
@@ -101,11 +129,11 @@ fun MainApp() {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = AccentEvergreen,
-                            selectedTextColor = AccentEvergreen,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
-                            indicatorColor = AccentEvergreen.copy(alpha = 0.15f)
+                            selectedIconColor = currentPalette.primary,
+                            selectedTextColor = currentPalette.primary,
+                            unselectedIconColor = currentPalette.textSecondary,
+                            unselectedTextColor = currentPalette.textSecondary,
+                            indicatorColor = currentPalette.primary.copy(alpha = 0.12f)
                         )
                     )
                 }
@@ -117,7 +145,20 @@ fun MainApp() {
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { HomeScreen() }
+            composable(Screen.Home.route) {
+                when (selectedVariant) {
+                    DesignVariant.DESIGN_01 -> Design01BankingScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_02 -> Design02MinimalScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_03 -> Design03EditorialScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_04 -> Design04DenseScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_05 -> Design05Material3Screen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_06 -> Design06SoftPremiumScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_07 -> Design07MonochromeScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_08 -> Design08LargeTypeScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_09 -> Design09CompactToolScreen(onOpenDesignSelector = { showDesignSelector = true })
+                    DesignVariant.DESIGN_10 -> Design10NeoGlassScreen(onOpenDesignSelector = { showDesignSelector = true })
+                }
+            }
             composable(Screen.Providers.route) { ProvidersScreen() }
             composable(Screen.Voice.route) { VoiceScreen() }
             composable(Screen.History.route) { HistoryScreen() }
