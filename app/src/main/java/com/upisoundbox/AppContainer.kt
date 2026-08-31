@@ -27,7 +27,7 @@ class AppContainer(val context: Context) {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val settingsRepository by lazy { SettingsRepository(context) }
-    val historyRepository by lazy { HistoryRepository() }
+    val historyRepository by lazy { HistoryRepository(context) }
     val diagnosticsRepository by lazy { DiagnosticsRepository() }
     val deduplicator by lazy { PaymentDeduplicator(60) }
 
