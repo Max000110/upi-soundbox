@@ -30,12 +30,10 @@ import androidx.navigation.compose.rememberNavController
 import com.upisoundbox.security.SecurityManager
 import com.upisoundbox.ui.designvariants.DesignSelectorDialog
 import com.upisoundbox.ui.designvariants.DesignVariant
-import com.upisoundbox.ui.designvariants.DesignVariantTheme
 import com.upisoundbox.ui.designvariants.variants.Design01BankingScreen
 import com.upisoundbox.ui.designvariants.variants.Design02MinimalScreen
 import com.upisoundbox.ui.designvariants.variants.Design03EditorialScreen
 import com.upisoundbox.ui.designvariants.variants.Design04DenseScreen
-import com.upisoundbox.ui.designvariants.variants.Design05Material3Screen
 import com.upisoundbox.ui.designvariants.variants.Design06SoftPremiumScreen
 import com.upisoundbox.ui.designvariants.variants.Design07MonochromeScreen
 import com.upisoundbox.ui.designvariants.variants.Design08LargeTypeScreen
@@ -44,8 +42,13 @@ import com.upisoundbox.ui.designvariants.variants.Design10NeoGlassScreen
 import com.upisoundbox.ui.navigation.Screen
 import com.upisoundbox.ui.screens.DiagnosticsScreen
 import com.upisoundbox.ui.screens.HistoryScreen
+import com.upisoundbox.ui.screens.HomeScreen
 import com.upisoundbox.ui.screens.ProvidersScreen
 import com.upisoundbox.ui.screens.VoiceScreen
+import com.upisoundbox.ui.theme.PrimaryContainerM3
+import com.upisoundbox.ui.theme.PrimaryM3
+import com.upisoundbox.ui.theme.SurfacePrimary
+import com.upisoundbox.ui.theme.TextSecondary
 import com.upisoundbox.ui.theme.UpiSoundboxTheme
 
 class MainActivity : ComponentActivity() {
@@ -74,10 +77,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
-    var selectedVariant by remember { mutableStateOf(DesignVariant.DESIGN_01) }
+    var selectedVariant by remember { mutableStateOf(DesignVariant.DESIGN_05) }
     var showDesignSelector by remember { mutableStateOf(false) }
-
-    val currentPalette = DesignVariantTheme.getPalette(selectedVariant)
 
     val screens = listOf(
         Screen.Home,
@@ -105,7 +106,7 @@ fun MainApp() {
             val currentRoute = navBackStackEntry?.destination?.route
 
             NavigationBar(
-                containerColor = currentPalette.surface
+                containerColor = SurfacePrimary
             ) {
                 screens.forEach { screen ->
                     NavigationBarItem(
@@ -129,11 +130,11 @@ fun MainApp() {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = currentPalette.primary,
-                            selectedTextColor = currentPalette.primary,
-                            unselectedIconColor = currentPalette.textSecondary,
-                            unselectedTextColor = currentPalette.textSecondary,
-                            indicatorColor = currentPalette.primary.copy(alpha = 0.12f)
+                            selectedIconColor = PrimaryM3,
+                            selectedTextColor = PrimaryM3,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = PrimaryContainerM3
                         )
                     )
                 }
@@ -147,11 +148,11 @@ fun MainApp() {
         ) {
             composable(Screen.Home.route) {
                 when (selectedVariant) {
+                    DesignVariant.DESIGN_05 -> HomeScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_01 -> Design01BankingScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_02 -> Design02MinimalScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_03 -> Design03EditorialScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_04 -> Design04DenseScreen(onOpenDesignSelector = { showDesignSelector = true })
-                    DesignVariant.DESIGN_05 -> Design05Material3Screen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_06 -> Design06SoftPremiumScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_07 -> Design07MonochromeScreen(onOpenDesignSelector = { showDesignSelector = true })
                     DesignVariant.DESIGN_08 -> Design08LargeTypeScreen(onOpenDesignSelector = { showDesignSelector = true })
