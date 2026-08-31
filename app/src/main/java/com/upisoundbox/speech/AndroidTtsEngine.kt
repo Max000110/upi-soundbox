@@ -12,52 +12,146 @@ import android.util.Log
 import com.upisoundbox.core.model.TtsStatus
 import com.upisoundbox.domain.model.SpeechRequest
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
-class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeech.OnInitListener {
+class AndroidTtsEngine(
+    private val context: Context,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
+) : SpeechEngine, TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = null
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
-    private val _status = MutableStateFlow(TtsStatus.INITIALIZING)
+    private val _status = MutableStateFlow(TtsStatus.UNINITIALIZED)
     val status: StateFlow<TtsStatus> = _status.asStateFlow()
 
-    private val initDeferred = CompletableDeferred<Boolean>()
+    private var initDeferred = CompletableDeferred<Boolean>()
+    private val initMutex = Mutex()
+    private var retryCount = 0
+    private val maxRetries = 3
+
+    var lastInitTime: Long = 0L
+        private set
+    var lastSpeechTime: Long = 0L
+        private set
+    var lastErrorMessage: String? = null
+        private set
 
     init {
         initialize()
     }
 
-    private fun initialize() {
+    fun initialize() {
+        scope.launch {
+            initMutex.withLock {
+                if (_status.value == TtsStatus.READY || _status.value == TtsStatus.INITIALIZING) {
+                    return@withLock
+                }
+                doInitializeLocked()
+            }
+        }
+    }
+
+    private fun doInitializeLocked() {
         try {
             _status.value = TtsStatus.INITIALIZING
-            Log.d("UpiSoundbox", "Initializing TextToSpeech engine...")
-            tts = TextToSpeech(context.applicationContext, this)
+            initDeferred = CompletableDeferred()
+            Log.i("UpiSoundbox", ">>> Initializing TextToSpeech engine (Attempt ${retryCount + 1})...")
+
+            // Prefer Google TTS engine for maximum stability and speed
+            val preferredEngine = getBestTtsEngine()
+            tts = if (preferredEngine != null) {
+                Log.d("UpiSoundbox", "Binding to preferred engine: $preferredEngine")
+                TextToSpeech(context.applicationContext, this, preferredEngine)
+            } else {
+                TextToSpeech(context.applicationContext, this)
+            }
+
+            // Launch watchdog timeout (7 seconds)
+            scope.launch {
+                delay(7000L)
+                if (_status.value == TtsStatus.INITIALIZING) {
+                    Log.w("UpiSoundbox", "TTS initialization timed out after 7s")
+                    _status.value = TtsStatus.ERROR
+                    lastErrorMessage = "Initialization timed out"
+                    if (!initDeferred.isCompleted) {
+                        initDeferred.complete(false)
+                    }
+                    scheduleRetry()
+                }
+            }
         } catch (e: Exception) {
             Log.e("UpiSoundbox", "Exception creating TextToSpeech", e)
             _status.value = TtsStatus.ERROR
+            lastErrorMessage = e.localizedMessage
             if (!initDeferred.isCompleted) {
                 initDeferred.complete(false)
             }
+            scheduleRetry()
         }
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             _status.value = TtsStatus.READY
+            retryCount = 0
+            lastInitTime = System.currentTimeMillis()
+            lastErrorMessage = null
             Log.i("UpiSoundbox", ">>> TextToSpeech Initialized successfully (Status: READY)")
             if (!initDeferred.isCompleted) {
                 initDeferred.complete(true)
             }
         } else {
-            _status.value = TtsStatus.UNAVAILABLE
+            _status.value = TtsStatus.ERROR
+            lastErrorMessage = "onInit returned error code $status"
             Log.e("UpiSoundbox", "TextToSpeech onInit failed with status code $status")
             if (!initDeferred.isCompleted) {
                 initDeferred.complete(false)
+            }
+            scheduleRetry()
+        }
+    }
+
+    private fun scheduleRetry() {
+        if (retryCount < maxRetries) {
+            retryCount++
+            val backoffMs = retryCount * 2000L
+            Log.i("UpiSoundbox", "Scheduling TTS auto-recovery retry $retryCount in ${backoffMs}ms...")
+            scope.launch {
+                delay(backoffMs)
+                reinitialize()
+            }
+        } else {
+            _status.value = TtsStatus.UNAVAILABLE
+            Log.e("UpiSoundbox", "TTS initialization reached max retries. Engine unavailable.")
+        }
+    }
+
+    fun reinitialize() {
+        scope.launch {
+            initMutex.withLock {
+                try {
+                    _status.value = TtsStatus.RETRYING
+                    Log.i("UpiSoundbox", ">>> Reinitializing TextToSpeech engine...")
+                    tts?.stop()
+                    tts?.shutdown()
+                } catch (e: Exception) {
+                    Log.w("UpiSoundbox", "Error shutting down stale TTS engine", e)
+                } finally {
+                    tts = null
+                }
+                doInitializeLocked()
             }
         }
     }
@@ -67,15 +161,17 @@ class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeec
     }
 
     override suspend fun speak(request: SpeechRequest): Boolean {
+        // Await readiness with timeout
         val ready = if (initDeferred.isCompleted) {
             @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
             initDeferred.getCompleted()
         } else {
-            withTimeoutOrNull(5000L) { initDeferred.await() } ?: false
+            withTimeoutOrNull(8000L) { initDeferred.await() } ?: false
         }
 
         if (!ready || tts == null) {
             Log.e("UpiSoundbox", "TTS speak called but engine not ready (ready=$ready, tts=$tts)")
+            reinitialize()
             return false
         }
 
@@ -132,6 +228,7 @@ class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeec
             override fun onStart(id: String?) {
                 if (id == utteranceId) {
                     _status.value = TtsStatus.SPEAKING
+                    lastSpeechTime = System.currentTimeMillis()
                     Log.i("UpiSoundbox", ">>> TTS UTTERANCE STARTED: $id (text='${request.text}')")
                 }
             }
@@ -148,6 +245,7 @@ class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeec
             override fun onError(id: String?) {
                 if (id == utteranceId) {
                     _status.value = TtsStatus.READY
+                    lastErrorMessage = "Utterance playback error on id $id"
                     Log.e("UpiSoundbox", ">>> TTS UTTERANCE ERROR: $id")
                     abandonFocus(focusRequest)
                     completionDeferred.complete(false)
@@ -162,11 +260,22 @@ class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeec
         }
 
         Log.i("UpiSoundbox", "Calling TextToSpeech.speak text='${request.text}' id=$utteranceId")
-        val result = engine.speak(request.text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        if (result != TextToSpeech.SUCCESS) {
+        try {
+            val result = engine.speak(request.text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            if (result != TextToSpeech.SUCCESS) {
+                _status.value = TtsStatus.ERROR
+                lastErrorMessage = "engine.speak returned error code $result"
+                Log.e("UpiSoundbox", "engine.speak returned error code $result")
+                abandonFocus(focusRequest)
+                reinitialize()
+                return false
+            }
+        } catch (e: Exception) {
+            Log.e("UpiSoundbox", "Exception during engine.speak", e)
             _status.value = TtsStatus.ERROR
-            Log.e("UpiSoundbox", "engine.speak returned error code $result")
+            lastErrorMessage = e.localizedMessage
             abandonFocus(focusRequest)
+            reinitialize()
             return false
         }
 
@@ -180,6 +289,22 @@ class AndroidTtsEngine(private val context: Context) : SpeechEngine, TextToSpeec
     private fun abandonFocus(focusRequest: AudioFocusRequest?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null && audioManager != null) {
             audioManager.abandonAudioFocusRequest(focusRequest)
+        }
+    }
+
+    private fun getBestTtsEngine(): String? {
+        val engines = try {
+            val pm = context.packageManager
+            val intent = android.content.Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE)
+            pm.queryIntentServices(intent, 0).map { it.serviceInfo.packageName }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        return when {
+            engines.contains("com.google.android.tts") -> "com.google.android.tts"
+            engines.isNotEmpty() -> engines.first()
+            else -> null
         }
     }
 

@@ -1,9 +1,11 @@
 package com.upisoundbox.core.model
 
-enum class TtsStatus {
-    INITIALIZING,
-    READY,
-    SPEAKING,
-    ERROR,
-    UNAVAILABLE
+enum class TtsStatus(val displayName: String) {
+    UNINITIALIZED("Uninitialized"),
+    INITIALIZING("Initializing"),
+    READY("Ready"),
+    SPEAKING("Speaking"),
+    RETRYING("Retrying"),
+    ERROR("Error"),
+    UNAVAILABLE("Unavailable")
 }

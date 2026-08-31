@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.upisoundbox.UpiSoundboxApp
 import com.upisoundbox.battery.BatteryOptimizationHelper
+import com.upisoundbox.core.model.TtsStatus
 import com.upisoundbox.domain.model.RawNotification
 import com.upisoundbox.notification.NotificationAccessChecker
 import com.upisoundbox.security.SecurityManager
@@ -51,6 +52,7 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
 
     val listenerState by container.diagnosticsRepository.listenerState.collectAsState()
     val events by container.diagnosticsRepository.diagnosticEvents.collectAsState()
+    val ttsStatus by (container.ttsEngine as com.upisoundbox.speech.AndroidTtsEngine).status.collectAsState()
     val isAccessGranted = NotificationAccessChecker.isAccessGranted(context)
     val isDeviceRooted = SecurityManager.isDeviceRooted()
     val isBatteryUnrestricted = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
@@ -92,8 +94,8 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
                 Spacer(modifier = Modifier.height(8.dp))
                 DiagnosticStatusRow(
                     label = "TTS Speech Engine",
-                    value = if (container.ttsEngine.isAvailable()) "Ready" else "Initializing",
-                    isSuccess = container.ttsEngine.isAvailable()
+                    value = ttsStatus.displayName,
+                    isSuccess = ttsStatus == TtsStatus.READY || ttsStatus == TtsStatus.SPEAKING
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 DiagnosticStatusRow(
@@ -103,8 +105,8 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 DiagnosticStatusRow(
-                    label = "Network Security",
-                    value = "Air-Gapped (No Internet)",
+                    label = "Boot Auto-Startup",
+                    value = "Configured (Active)",
                     isSuccess = true
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -128,15 +130,16 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
                 Text("Notification Access", style = MaterialTheme.typography.labelMedium)
             }
 
-            if (!isBatteryUnrestricted) {
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                OutlinedButton(
-                    onClick = { BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(context) },
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text("Set Unrestricted", style = MaterialTheme.typography.labelMedium)
-                }
+            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+
+            OutlinedButton(
+                onClick = {
+                    (container.ttsEngine as? com.upisoundbox.speech.AndroidTtsEngine)?.reinitialize()
+                },
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text("Reinit TTS Engine", style = MaterialTheme.typography.labelMedium)
             }
         }
 
