@@ -29,7 +29,7 @@ class AppContainer(val context: Context) {
     val settingsRepository by lazy { SettingsRepository(context) }
     val historyRepository by lazy { HistoryRepository(context) }
     val diagnosticsRepository by lazy { DiagnosticsRepository() }
-    val deduplicator by lazy { PaymentDeduplicator(60) }
+    val deduplicator by lazy { PaymentDeduplicator(context, 60) }
 
     val ttsEngine by lazy { AndroidTtsEngine(context) }
     val speechQueue by lazy { SpeechQueue(ttsEngine, applicationScope) }
@@ -65,22 +65,25 @@ class AppContainer(val context: Context) {
                             return@launch
                         }
 
-                        // 3. Deduplicate
-                        if (deduplicator.isDuplicate(event)) {
-                            Log.w("UpiSoundbox", "Duplicate payment suppressed: ${event.amountMajorFormatted}")
+                        // 3. Persistent & In-Memory Deduplication Check
+                        if (deduplicator.isDuplicate(event, historyRepository)) {
+                            Log.w("UpiSoundbox", "Duplicate payment suppressed: ${event.amountMajorFormatted} (durableId=${event.durableIdentity})")
                             diagnosticsRepository.logDiagnostic(
                                 DiagnosticEvent(
                                     eventType = "DUPLICATE_SUPPRESSED",
                                     provider = event.provider.displayName,
-                                    message = "Duplicate event suppressed (${event.amountMajorFormatted})"
+                                    direction = event.direction.name,
+                                    amountPresent = true,
+                                    confidence = event.confidence,
+                                    message = "Suppressed duplicate: ${event.amountMajorFormatted} from ${event.payerName ?: "Unknown"} (Ref: ${event.transactionReference ?: event.sourceNotificationKey})"
                                 )
                             )
                             return@launch
                         }
 
-                        // 4. Save to history
+                        // 4. Atomically record and mark announced in persistent storage BEFORE queueing speech
                         if (currentSettings.isHistoryEnabled) {
-                            historyRepository.addEvent(event)
+                            historyRepository.recordAndMarkAnnounced(event)
                         }
 
                         // 5. Update diagnostics

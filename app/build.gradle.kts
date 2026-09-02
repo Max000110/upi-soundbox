@@ -59,6 +59,10 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         checkReleaseBuilds = false
         abortOnError = false
