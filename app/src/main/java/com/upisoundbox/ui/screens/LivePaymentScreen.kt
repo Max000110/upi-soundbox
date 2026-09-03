@@ -64,7 +64,7 @@ fun LivePaymentScreen(
     val payerText = latestEvent?.payerName ?: "Rahul Kumar"
     val providerText = latestEvent?.provider?.displayName ?: "PhonePe"
     val timeText = if (latestEvent != null) {
-        SimpleDateFormat("12:45 PM | dd MMM yyyy", Locale.getDefault()).format(Date(latestEvent.eventTime))
+        SimpleDateFormat("hh:mm a | dd MMM yyyy", Locale.getDefault()).format(Date(latestEvent.eventTime))
     } else {
         "12:45 PM | 23 May 2025"
     }

@@ -295,7 +295,7 @@ fun RecentPaymentTile(
     event: PaymentEvent,
     modifier: Modifier = Modifier
 ) {
-    val timeStr = SimpleDateFormat("23 May, 12:45 PM", Locale.getDefault()).format(Date(event.eventTime))
+    val timeStr = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(Date(event.eventTime))
     val payerName = event.payerName ?: "Rahul Kumar"
     val initial = payerName.firstOrNull()?.uppercase() ?: "R"
 
