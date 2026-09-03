@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Soundbox Housing -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M32,24 L76,24 A8,8 0 0,1 84,32 L84,76 A8,8 0 0,1 76,84 L32,84 A8,8 0 0,1 24,76 L24,32 A8,8 0 0,1 32,24 Z" />
+
+    <!-- Sleek Neon Cyan Border -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M32,24 L76,24 A8,8 0 0,1 84,32 L84,76 A8,8 0 0,1 76,84 L32,84 A8,8 0 0,1 24,76 L24,32 A8,8 0 0,1 32,24 Z" />
+
+    <!-- Speaker Cone Outer Rim -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M54,34 C64.493,34 73,42.507 73,53 C73,63.493 64.493,72 54,72 C43.507,72 35,63.493 35,53 C35,42.507 43.507,34 54,34 Z" />
+
+    <!-- Speaker Inner Acoustic Chamber -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M54,39 C61.732,39 68,45.268 68,53 C68,60.732 61.732,67 54,67 C46.268,67 40,60.732 40,53 C40,45.268 46.268,39 54,39 Z" />
+
+    <!-- Center Hub -->
+    <path
+        android:fillColor="#1E1B4B"
+        android:pathData="M54,44 C58.971,44 63,48.029 63,53 C63,57.971 58.971,62 54,62 C49.029,62 45,57.971 45,53 C45,48.029 49.029,44 54,44 Z" />
+
+    <!-- Indian Rupee (₹) Symbol in Gold -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M49,47 L59,47 L59,49 L55,49 C56.5,49.8 57.2,51 57,52.5 L59,52.5 L59,54 L56.8,54 C56.2,56 54.5,57.2 52.5,57.5 L58.5,63 L55.5,63 L50,57.5 L50,56 C52.2,56 54,55 54.5,54 L49,54 L49,52.5 L54.5,52.5 C54.2,51.5 53.2,50.8 52,50.8 L49,50.8 Z" />
+
+    <!-- Status Power LED -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,27 C55.105,27 56,27.895 56,29 C56,30.105 55.105,31 54,31 C52.895,31 52,30.105 52,29 C52,27.895 52.895,27 54,27 Z" />
+
+    <!-- Left Sound Wave (Small) -->
+    <path
+        android:strokeColor="#60A5FA"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M18,46 C16,50 16,56 18,60" />
+
+    <!-- Left Sound Wave (Large) -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M12,41 C9,48 9,58 12,65" />
+
+    <!-- Right Sound Wave (Small) -->
+    <path
+        android:strokeColor="#60A5FA"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M90,46 C92,50 92,56 90,60" />
+
+    <!-- Right Sound Wave (Large) -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M96,41 C99,48 99,58 96,65" />
+
+    <!-- Top Sound Wave -->
+    <path
+        android:strokeColor="#818CF8"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M45,17 C50,15 58,15 63,17" />
+
+</vector>
