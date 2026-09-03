@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,30 +59,29 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val container = UpiSoundboxApp.instance.container
     val settings by container.settingsRepository.settingsFlow.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+    var langDropdownExpanded by remember { mutableStateOf(false) }
+    var voiceDropdownExpanded by remember { mutableStateOf(false) }
 
     val currentLang = settings?.language ?: "en"
     val currentPersona = settings?.voicePersona ?: VoicePersona.COQUI_WARM_RETAIL_FEMALE
-    val volume = settings?.volume ?: 0.8f
-    val autoStart = settings?.autoStartOnBoot ?: true
-    val autoRestart = settings?.autoRestartService ?: true
-    val vibration = settings?.vibrationEnabled ?: true
-    val ledBlink = settings?.ledBlinkEnabled ?: false
-    val protectSettings = settings?.isSecureScreenEnabled ?: true
-    val activeThemeName = settings?.themeVariant ?: SoundboxThemeId.OCEAN_BLUE.name
+    val currentTheme = settings?.themeVariant ?: "DARK_NAVY"
 
-    var showLangMenu by remember { mutableStateOf(false) }
-    var showVoiceMenu by remember { mutableStateOf(false) }
+    var volumeSlider by remember(settings?.volume) {
+        mutableFloatStateOf(settings?.volume ?: 0.8f)
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 18.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Header
+        // Header: Settings
         Text(
             text = "Settings",
             style = MaterialTheme.typography.titleLarge,
@@ -91,81 +91,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SECTION: 10 Dynamic Theme Variants
-        Text(
-            text = "Dynamic Themes",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Select one of 10 unique visual identities",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SoundboxThemeId.entries.forEach { theme ->
-                val isSelected = theme.name.equals(activeThemeName, ignoreCase = true)
-
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                    ),
-                    border = BorderStroke(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier
-                        .clickable {
-                            scope.launch {
-                                container.settingsRepository.updateThemeVariant(theme.name)
-                            }
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(theme.primaryColor),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = theme.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // SECTION 1: Voice & Speech
+        // Section 1: Voice & Speech
         Text(
             text = "Voice & Speech",
             fontSize = 15.sp,
@@ -178,15 +104,20 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 // Voice Language Dropdown
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showLangMenu = true },
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -196,47 +127,56 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (currentLang == "hi") "हिंदी (India)" else "English (India)",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showLangMenu,
-                        onDismissRequest = { showLangMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("English (India)") },
-                            onClick = {
-                                scope.launch { container.settingsRepository.updateLanguage("en") }
-                                showLangMenu = false
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF1E293B))
+                                .border(BorderStroke(1.dp, Color(0xFF334155)), RoundedCornerShape(10.dp))
+                                .clickable { langDropdownExpanded = true }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (currentLang == "hi") "हिंदी (Hindi)" else "English (India)",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF38BDF8),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("हिंदी (Hindi)") },
-                            onClick = {
-                                scope.launch { container.settingsRepository.updateLanguage("hi") }
-                                showLangMenu = false
-                            }
-                        )
+                        }
+                        DropdownMenu(
+                            expanded = langDropdownExpanded,
+                            onDismissRequest = { langDropdownExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("English (India)") },
+                                onClick = {
+                                    langDropdownExpanded = false
+                                    scope.launch { container.settingsRepository.updateLanguage("en") }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("हिंदी (Hindi)") },
+                                onClick = {
+                                    langDropdownExpanded = false
+                                    scope.launch { container.settingsRepository.updateLanguage("hi") }
+                                }
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
                 // Voice Style Dropdown
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showVoiceMenu = true },
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -246,59 +186,88 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = currentPersona.title,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showVoiceMenu,
-                        onDismissRequest = { showVoiceMenu = false }
-                    ) {
-                        VoicePersona.entries.forEach { persona ->
-                            DropdownMenuItem(
-                                text = { Text(persona.title) },
-                                onClick = {
-                                    scope.launch { container.settingsRepository.updateVoicePersona(persona) }
-                                    showVoiceMenu = false
-                                }
-                            )
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF1E293B))
+                                .border(BorderStroke(1.dp, Color(0xFF334155)), RoundedCornerShape(10.dp))
+                                .clickable { voiceDropdownExpanded = true }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentPersona.title.take(18) + "...",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF38BDF8),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = voiceDropdownExpanded,
+                            onDismissRequest = { voiceDropdownExpanded = false }
+                        ) {
+                            VoicePersona.entries.forEach { persona ->
+                                DropdownMenuItem(
+                                    text = { Text(persona.title) },
+                                    onClick = {
+                                        voiceDropdownExpanded = false
+                                        scope.launch { container.settingsRepository.updateVoicePersona(persona) }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Speech Volume Slider
-                Text(
-                    text = "Speech Volume: ${(volume * 100).toInt()}%",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Slider(
-                    value = volume,
-                    onValueChange = { scope.launch { container.settingsRepository.updateVolume(it) } },
-                    valueRange = 0.2f..1.0f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
+                // Inline Speech Volume Slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Speech Volume",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.width(110.dp)
                     )
-                )
+                    Slider(
+                        value = volumeSlider,
+                        onValueChange = { volumeSlider = it },
+                        onValueChangeFinished = {
+                            scope.launch { container.settingsRepository.updateVolume(volumeSlider) }
+                        },
+                        valueRange = 0.0f..1.0f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF38BDF8),
+                            activeTrackColor = Color(0xFF38BDF8),
+                            inactiveTrackColor = Color(0xFF1E293B)
+                        )
+                    )
+                    Text(
+                        text = "${(volumeSlider * 100).toInt()}%",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // SECTION 2: General
+        // Section 2: General Preferences
         Text(
             text = "General",
             fontSize = 15.sp,
@@ -311,109 +280,54 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Auto Start on Boot
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Auto Start on Boot",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = autoStart,
-                        onCheckedChange = { scope.launch { container.settingsRepository.updateAutoStartOnBoot(it) } },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                GeneralToggleRow(
+                    title = "Auto Start on Boot",
+                    checked = settings?.autoStartOnBoot ?: true,
+                    onCheckedChange = { checked ->
+                        scope.launch { container.settingsRepository.updateAutoStartOnBoot(checked) }
+                    }
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                GeneralToggleRow(
+                    title = "Auto Restart Service",
+                    checked = settings?.autoRestartService ?: true,
+                    onCheckedChange = { checked ->
+                        scope.launch { container.settingsRepository.updateAutoRestartService(checked) }
+                    }
+                )
 
-                // Auto Restart Service
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Auto Restart Service",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = autoRestart,
-                        onCheckedChange = { scope.launch { container.settingsRepository.updateAutoRestartService(it) } },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
+                GeneralToggleRow(
+                    title = "Vibration",
+                    checked = settings?.vibrationEnabled ?: true,
+                    onCheckedChange = { checked ->
+                        scope.launch { container.settingsRepository.updateVibration(checked) }
+                    }
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Vibration
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Vibration",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = vibration,
-                        onCheckedChange = { scope.launch { container.settingsRepository.updateVibration(it) } },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // LED Blink on Payment
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "LED Blink on Payment",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = ledBlink,
-                        onCheckedChange = { scope.launch { container.settingsRepository.updateLedBlink(it) } },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
+                GeneralToggleRow(
+                    title = "LED Blink on Payment",
+                    checked = settings?.ledBlinkEnabled ?: false,
+                    onCheckedChange = { checked ->
+                        scope.launch { container.settingsRepository.updateLedBlink(checked) }
+                    }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // SECTION 3: Security
+        // Section 3: Security
         Text(
             text = "Security",
             fontSize = 15.sp,
@@ -426,8 +340,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
         ) {
             Row(
                 modifier = Modifier
@@ -444,22 +360,114 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Enable anti-spyware screen shield (FLAG_SECURE)",
+                        text = "Block screen recording & spyware captures (FLAG_SECURE)",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Spacer(modifier = Modifier.width(12.dp))
                 Switch(
-                    checked = protectSettings,
-                    onCheckedChange = { scope.launch { container.settingsRepository.updateSecureScreen(it) } },
+                    checked = settings?.isSecureScreenEnabled ?: true,
+                    onCheckedChange = { checked ->
+                        scope.launch { container.settingsRepository.updateSecureScreen(checked) }
+                    },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        checkedThumbColor = Color(0xFF10B981),
+                        checkedTrackColor = Color(0xFF064E3B),
+                        uncheckedThumbColor = Color(0xFF64748B),
+                        uncheckedTrackColor = Color(0xFF1E293B)
                     )
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Section 4: 10 Dynamic Theme Variants
+        Text(
+            text = "10 Dynamic Themes",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(SoundboxThemeId.entries) { themeItem ->
+                val isSelected = currentTheme.equals(themeItem.name, ignoreCase = true)
+                Card(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            scope.launch {
+                                container.settingsRepository.updateThemeVariant(themeItem.name)
+                            }
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) Color(0xFF1E293B) else Color(0xFF162032)
+                    ),
+                    border = BorderStroke(
+                        if (isSelected) 1.5.dp else 1.dp,
+                        if (isSelected) themeItem.primaryColor else Color(0xFF26354D)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(themeItem.primaryColor)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = themeItem.displayName,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun GeneralToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color(0xFF38BDF8),
+                checkedTrackColor = Color(0xFF0284C7),
+                uncheckedThumbColor = Color(0xFF64748B),
+                uncheckedTrackColor = Color(0xFF1E293B)
+            )
+        )
     }
 }
