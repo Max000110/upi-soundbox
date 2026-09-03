@@ -70,12 +70,12 @@ class AppContainer(val context: Context) {
                             Log.w("UpiSoundbox", "Duplicate payment suppressed: ${event.amountMajorFormatted} (durableId=${event.durableIdentity})")
                             diagnosticsRepository.logDiagnostic(
                                 DiagnosticEvent(
-                                    eventType = "DUPLICATE_SUPPRESSED",
+                                    eventType = "PAYMENT_REPLAY_BLOCKED",
                                     provider = event.provider.displayName,
                                     direction = event.direction.name,
                                     amountPresent = true,
                                     confidence = event.confidence,
-                                    message = "Suppressed duplicate: ${event.amountMajorFormatted} from ${event.payerName ?: "Unknown"} (Ref: ${event.transactionReference ?: event.sourceNotificationKey})"
+                                    message = "Replay blocked: ${event.amountMajorFormatted} from ${event.payerName ?: "Unknown"} (Ref: ${event.transactionReference ?: event.sourceNotificationKey})"
                                 )
                             )
                             return@launch
