@@ -33,6 +33,11 @@ class SettingsRepository(private val context: Context) {
         val HISTORY_ENABLED = booleanPreferencesKey("history_enabled")
         val SECURE_SCREEN = booleanPreferencesKey("secure_screen")
         val VOICE_PERSONA_ID = stringPreferencesKey("voice_persona_id")
+        val THEME_VARIANT = stringPreferencesKey("theme_variant")
+        val AUTO_START_BOOT = booleanPreferencesKey("auto_start_boot")
+        val AUTO_RESTART_SERVICE = booleanPreferencesKey("auto_restart_service")
+        val VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+        val LED_BLINK_ENABLED = booleanPreferencesKey("led_blink_enabled")
     }
 
     val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -49,8 +54,33 @@ class SettingsRepository(private val context: Context) {
             enabledProviders = prefs[Keys.ENABLED_PROVIDERS] ?: defaultProviders,
             isHistoryEnabled = prefs[Keys.HISTORY_ENABLED] ?: true,
             isSecureScreenEnabled = prefs[Keys.SECURE_SCREEN] ?: true,
-            voicePersona = VoicePersona.fromId(prefs[Keys.VOICE_PERSONA_ID])
+            voicePersona = VoicePersona.fromId(prefs[Keys.VOICE_PERSONA_ID]),
+            themeVariant = prefs[Keys.THEME_VARIANT] ?: "OCEAN_BLUE",
+            autoStartOnBoot = prefs[Keys.AUTO_START_BOOT] ?: true,
+            autoRestartService = prefs[Keys.AUTO_RESTART_SERVICE] ?: true,
+            vibrationEnabled = prefs[Keys.VIBRATION_ENABLED] ?: true,
+            ledBlinkEnabled = prefs[Keys.LED_BLINK_ENABLED] ?: false
         )
+    }
+
+    suspend fun updateThemeVariant(themeName: String) {
+        context.dataStore.edit { it[Keys.THEME_VARIANT] = themeName }
+    }
+
+    suspend fun updateAutoStartOnBoot(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_START_BOOT] = enabled }
+    }
+
+    suspend fun updateAutoRestartService(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_RESTART_SERVICE] = enabled }
+    }
+
+    suspend fun updateVibration(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.VIBRATION_ENABLED] = enabled }
+    }
+
+    suspend fun updateLedBlink(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.LED_BLINK_ENABLED] = enabled }
     }
 
     suspend fun updateVoicePersona(persona: VoicePersona) {

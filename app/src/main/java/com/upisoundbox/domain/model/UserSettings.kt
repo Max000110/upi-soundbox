@@ -15,7 +15,12 @@ data class UserSettings(
     val enabledProviders: Set<String> = Provider.entries.map { it.name }.toSet(),
     val isHistoryEnabled: Boolean = true,
     val isSecureScreenEnabled: Boolean = true,
-    val voicePersona: VoicePersona = VoicePersona.COQUI_WARM_RETAIL_FEMALE
+    val voicePersona: VoicePersona = VoicePersona.COQUI_WARM_RETAIL_FEMALE,
+    val themeVariant: String = "OCEAN_BLUE",
+    val autoStartOnBoot: Boolean = true,
+    val autoRestartService: Boolean = true,
+    val vibrationEnabled: Boolean = true,
+    val ledBlinkEnabled: Boolean = false
 ) {
     fun isProviderEnabled(provider: Provider): Boolean {
         return enabledProviders.contains(provider.name)

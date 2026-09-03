@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -29,9 +30,9 @@ import com.upisoundbox.ui.navigation.Screen
 import com.upisoundbox.ui.screens.DiagnosticsScreen
 import com.upisoundbox.ui.screens.HistoryScreen
 import com.upisoundbox.ui.screens.HomeScreen
+import com.upisoundbox.ui.screens.LivePaymentScreen
 import com.upisoundbox.ui.screens.SettingsScreen
 import com.upisoundbox.ui.screens.VoiceScreen
-import com.upisoundbox.ui.theme.SoundboxColors
 import com.upisoundbox.ui.theme.UpiSoundboxTheme
 
 class MainActivity : ComponentActivity() {
@@ -50,7 +51,9 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            UpiSoundboxTheme {
+            val themeName = settings?.themeVariant ?: "OCEAN_BLUE"
+
+            UpiSoundboxTheme(themeName = themeName) {
                 MainApp()
             }
         }
@@ -61,25 +64,25 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val navController = rememberNavController()
 
-    val screens = listOf(
+    val navScreens = listOf(
         Screen.Home,
+        Screen.LivePayment,
         Screen.History,
         Screen.Voice,
-        Screen.Settings,
-        Screen.Diagnostics
+        Screen.Settings
     )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = SoundboxColors.Background,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
             NavigationBar(
-                containerColor = SoundboxColors.Surface
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
-                screens.forEach { screen ->
+                navScreens.forEach { screen ->
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.title) },
                         label = {
@@ -101,11 +104,11 @@ fun MainApp() {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SoundboxColors.PrimaryAccent,
-                            selectedTextColor = SoundboxColors.PrimaryAccent,
-                            unselectedIconColor = SoundboxColors.SecondaryText,
-                            unselectedTextColor = SoundboxColors.SecondaryText,
-                            indicatorColor = SoundboxColors.PrimaryAccentContainer
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     )
                 }
@@ -117,7 +120,14 @@ fun MainApp() {
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { HomeScreen() }
+            composable(Screen.Home.route) {
+                HomeScreen(
+                    onNavigateToHistory = { navController.navigate(Screen.History.route) },
+                    onNavigateToLive = { navController.navigate(Screen.LivePayment.route) },
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                )
+            }
+            composable(Screen.LivePayment.route) { LivePaymentScreen() }
             composable(Screen.History.route) { HistoryScreen() }
             composable(Screen.Voice.route) { VoiceScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }

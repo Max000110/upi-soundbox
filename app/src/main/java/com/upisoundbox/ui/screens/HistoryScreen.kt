@@ -17,15 +17,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,272 +45,241 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.upisoundbox.UpiSoundboxApp
 import com.upisoundbox.domain.model.PaymentEvent
-import com.upisoundbox.ui.theme.SoundboxColors
-import com.upisoundbox.ui.theme.SoundboxDimensions
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+enum class HistoryFilter {
+    ALL, TODAY, YESTERDAY, THIS_WEEK
+}
+
 @Composable
 fun HistoryScreen(modifier: Modifier = Modifier) {
     val container = UpiSoundboxApp.instance.container
     val history by container.historyRepository.history.collectAsState()
-    var showClearDialog by remember { mutableStateOf(false) }
 
-    val (todayTotalMinor, todayCount) = container.historyRepository.getTodayStats()
-    val todayFormatted = "₹" + String.format(Locale.getDefault(), "%,.2f", todayTotalMinor / 100.0)
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
 
-    val groupedHistory = remember(history) {
-        groupHistoryByDate(history)
+    val filteredHistory = remember(history, searchQuery, selectedFilter) {
+        val now = Calendar.getInstance()
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val yesterdayStart = todayStart - (24 * 3600 * 1000L)
+        val weekStart = todayStart - (7 * 24 * 3600 * 1000L)
+
+        history.filter { event ->
+            val matchesSearch = searchQuery.isBlank() ||
+                (event.payerName?.contains(searchQuery, ignoreCase = true) == true) ||
+                (event.amountMajorFormatted.contains(searchQuery)) ||
+                (event.provider.displayName.contains(searchQuery, ignoreCase = true))
+
+            val matchesFilter = when (selectedFilter) {
+                HistoryFilter.ALL -> true
+                HistoryFilter.TODAY -> event.eventTime >= todayStart
+                HistoryFilter.YESTERDAY -> event.eventTime in yesterdayStart until todayStart
+                HistoryFilter.THIS_WEEK -> event.eventTime >= weekStart
+            }
+
+            matchesSearch && matchesFilter
+        }
     }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SoundboxColors.Background)
-            .padding(horizontal = SoundboxDimensions.ScreenPadding)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 18.dp)
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Header
+        // Header: History + Filter Icon
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Payment History",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = SoundboxColors.PrimaryText
-                )
-                Text(
-                    text = "Merchant Transaction Ledger",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SoundboxColors.SecondaryText
+            Text(
+                text = "History",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            IconButton(onClick = { /* Toggle filter menu */ }) {
+                Icon(
+                    imageVector = Icons.Default.FilterList,
+                    contentDescription = "Filter",
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
-            if (history.isNotEmpty()) {
-                OutlinedButton(
-                    onClick = { showClearDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, SoundboxColors.Error.copy(alpha = 0.5f))
-                ) {
-                    Text("Clear", color = SoundboxColors.Error, fontSize = 12.sp)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Search Bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search transactions...", fontSize = 14.sp) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Filter Chips: [All] [Today] [Yesterday] [This Week]
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            HistoryFilter.entries.forEach { filter ->
+                val label = when (filter) {
+                    HistoryFilter.ALL -> "All"
+                    HistoryFilter.TODAY -> "Today"
+                    HistoryFilter.YESTERDAY -> "Yesterday"
+                    HistoryFilter.THIS_WEEK -> "This Week"
                 }
+                val isSelected = selectedFilter == filter
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { selectedFilter = filter },
+                    label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                        enabled = true,
+                        selected = isSelected
+                    )
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Daily Summary Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SoundboxColors.Surface),
-            border = BorderStroke(1.dp, SoundboxColors.Border),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "TODAY'S RECEIVED TOTAL",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SoundboxColors.SecondaryText
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = todayFormatted,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SoundboxColors.PrimaryText
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(SoundboxColors.PaymentSuccessContainer)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "$todayCount Received",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = SoundboxColors.PaymentSuccess
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (history.isEmpty()) {
+        // Transactions List
+        if (filteredHistory.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "No transaction records",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = SoundboxColors.PrimaryText
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Received UPI payments will be listed here.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SoundboxColors.SecondaryText
-                    )
-                }
+                Text(
+                    text = "No transactions found",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                groupedHistory.forEach { (header, events) ->
-                    item {
-                        Text(
-                            text = header,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SoundboxColors.SecondaryText,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)
-                        )
-                    }
-
-                    items(events, key = { it.id }) { event ->
-                        val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(event.eventTime))
-                        val payerName = event.payerName ?: "UPI Customer"
-                        val initial = payerName.firstOrNull()?.uppercase() ?: "U"
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = SoundboxColors.Surface),
-                            border = BorderStroke(1.dp, SoundboxColors.Border),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(SoundboxColors.PaymentSuccessContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = initial,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = SoundboxColors.PaymentSuccess
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = payerName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = SoundboxColors.PrimaryText
-                                    )
-                                    val refInfo = if (!event.transactionReference.isNullOrBlank()) {
-                                        " • Ref: ${event.transactionReference}"
-                                    } else ""
-                                    Text(
-                                        text = "${event.provider.displayName} • $timeStr$refInfo",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = SoundboxColors.SecondaryText
-                                    )
-                                }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = event.amountMajorFormatted,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = SoundboxColors.PrimaryText
-                                    )
-                                    Text(
-                                        text = "✓ Announced",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = SoundboxColors.PaymentSuccess
-                                    )
-                                }
-                            }
-                        }
-                    }
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = filteredHistory,
+                    key = { it.id }
+                ) { event ->
+                    HistoryItemCard(event = event)
                 }
             }
         }
-    }
-
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text("Delete Payment History?", fontWeight = FontWeight.Bold) },
-            text = { Text("This will remove locally stored payment records from this device. Transaction totals will reset.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        container.historyRepository.clearHistory()
-                        showClearDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = SoundboxColors.Error)
-                ) {
-                    Text("Delete", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel", color = SoundboxColors.SecondaryText)
-                }
-            }
-        )
     }
 }
 
-private fun groupHistoryByDate(events: List<PaymentEvent>): Map<String, List<PaymentEvent>> {
-    val now = Calendar.getInstance()
-    val todayStart = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+@Composable
+fun HistoryItemCard(
+    event: PaymentEvent,
+    modifier: Modifier = Modifier
+) {
+    val timeStr = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(Date(event.eventTime))
+    val payerName = event.payerName ?: "UPI Customer"
+    val initial = payerName.firstOrNull()?.uppercase() ?: "U"
 
-    val yesterdayStart = todayStart - (24 * 3600 * 1000L)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initial,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
-    val map = linkedMapOf<String, MutableList<PaymentEvent>>()
+            Spacer(modifier = Modifier.width(12.dp))
 
-    for (event in events) {
-        val group = when {
-            event.eventTime >= todayStart -> "TODAY"
-            event.eventTime >= yesterdayStart -> "YESTERDAY"
-            else -> SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(event.eventTime)).uppercase()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = payerName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = timeStr,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = event.amountMajorFormatted,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = event.provider.displayName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
-        map.getOrPut(group) { mutableListOf() }.add(event)
     }
-
-    return map
 }

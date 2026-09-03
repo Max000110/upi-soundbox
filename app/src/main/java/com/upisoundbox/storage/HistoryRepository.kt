@@ -268,6 +268,34 @@ class HistoryRepository(
         }
     }
 
+    data class DashboardMetrics(
+        val totalReceivedMinor: Long,
+        val transactionCount: Int,
+        val averageTransactionMinor: Long,
+        val activeProvidersCount: Int
+    )
+
+    fun getDashboardMetrics(): DashboardMetrics {
+        val startOfDay = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val todayEvents = _history.value.filter { it.eventTime >= startOfDay }
+        val totalMinor = todayEvents.sumOf { it.amountMinor }
+        val count = todayEvents.size
+        val avgMinor = if (count > 0) totalMinor / count else 0L
+        val providers = todayEvents.map { it.provider }.distinct().size
+        return DashboardMetrics(
+            totalReceivedMinor = totalMinor,
+            transactionCount = count,
+            averageTransactionMinor = avgMinor,
+            activeProvidersCount = if (providers > 0) providers else Provider.entries.size
+        )
+    }
+
     fun getTodayStats(): Pair<Long, Int> {
         val startOfDay = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
