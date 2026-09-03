@@ -129,7 +129,7 @@ fun MainApp() {
             }
             composable(Screen.LivePayment.route) {
                 LivePaymentScreen(
-                    onNavigateBack = { navController.navigate(Screen.Home.route) }
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(Screen.History.route) { HistoryScreen() }

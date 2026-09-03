@@ -29,8 +29,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +44,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.upisoundbox.UpiSoundboxApp
 import com.upisoundbox.domain.model.PaymentEvent
 import com.upisoundbox.notification.NotificationAccessChecker
@@ -55,11 +62,28 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val container = UpiSoundboxApp.instance.container
 
     val history by container.historyRepository.history.collectAsState()
-    val isAccessGranted = NotificationAccessChecker.isAccessGranted(context)
-    val metrics = container.historyRepository.getDashboardMetrics()
+
+    var isAccessGranted by remember {
+        mutableStateOf(NotificationAccessChecker.isAccessGranted(context))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isAccessGranted = NotificationAccessChecker.isAccessGranted(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val metrics = remember(history) {
+        container.historyRepository.getDashboardMetrics()
+    }
 
     val totalFormatted = "₹" + String.format(Locale.getDefault(), "%,.0f", metrics.totalReceivedMinor / 100.0)
     val avgFormatted = "₹" + String.format(Locale.getDefault(), "%,.0f", metrics.averageTransactionMinor / 100.0)

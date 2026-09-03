@@ -27,6 +27,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,12 @@ fun LivePaymentScreen(
 
     val latestEvent = history.firstOrNull()
     var isTestActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(ttsStatus) {
+        if (ttsStatus == TtsStatus.READY && isTestActive) {
+            isTestActive = false
+        }
+    }
 
     val amountText = latestEvent?.amountMajorFormatted ?: "₹350"
     val payerText = latestEvent?.payerName ?: "Rahul Kumar"
