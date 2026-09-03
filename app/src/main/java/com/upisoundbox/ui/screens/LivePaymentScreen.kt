@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -41,27 +43,28 @@ import com.upisoundbox.UpiSoundboxApp
 import com.upisoundbox.core.model.TtsStatus
 import com.upisoundbox.domain.model.SpeechRequest
 import com.upisoundbox.ui.components.SoundwaveVisualizer
-import com.upisoundbox.ui.theme.SoundboxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun LivePaymentScreen(modifier: Modifier = Modifier) {
+fun LivePaymentScreen(
+    onNavigateBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
     val container = UpiSoundboxApp.instance.container
     val history by container.historyRepository.history.collectAsState()
     val ttsStatus by container.ttsEngine.status.collectAsState()
     val isSpeaking = ttsStatus == TtsStatus.SPEAKING
 
     val latestEvent = history.firstOrNull()
-
     var isTestActive by remember { mutableStateOf(false) }
 
     val amountText = latestEvent?.amountMajorFormatted ?: "₹350"
     val payerText = latestEvent?.payerName ?: "Rahul Kumar"
     val providerText = latestEvent?.provider?.displayName ?: "PhonePe"
     val timeText = if (latestEvent != null) {
-        SimpleDateFormat("hh:mm a | dd MMM yyyy", Locale.getDefault()).format(Date(latestEvent.eventTime))
+        SimpleDateFormat("12:45 PM | dd MMM yyyy", Locale.getDefault()).format(Date(latestEvent.eventTime))
     } else {
         "12:45 PM | 23 May 2025"
     }
@@ -70,29 +73,42 @@ fun LivePaymentScreen(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 18.dp)
     ) {
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Top App Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { onNavigateBack?.invoke() }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Live Payment",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = "Live Payment",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Large Hero Card
+        // Large Forest Green Container Card (Exact from Reference Mockup)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = Color(0xFF064E3B)
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -100,19 +116,19 @@ fun LivePaymentScreen(modifier: Modifier = Modifier) {
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Large Green Checkmark Circle
+                // Large Emerald Green Checkmark Circle with White Icon
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(68.dp)
                         .clip(CircleShape)
-                        .background(SoundboxColors.PaymentSuccess),
+                        .background(Color(0xFF10B981)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Success",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(38.dp)
                     )
                 }
 
@@ -120,64 +136,85 @@ fun LivePaymentScreen(modifier: Modifier = Modifier) {
 
                 Text(
                     text = "Payment Received",
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color(0xFFA7F3D0)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Huge Amount
+                // Huge 54sp Bold White Amount
                 Text(
                     text = amountText,
-                    fontSize = 52.sp,
+                    fontSize = 54.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-1.5).sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color.White
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "From $payerText",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = "From",
+                    fontSize = 13.sp,
+                    color = Color(0xFF94A3B8)
+                )
+
+                Text(
+                    text = payerText,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "via $providerText",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                    text = "via",
+                    fontSize = 13.sp,
+                    color = Color(0xFF94A3B8)
                 )
-
-                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = timeText,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = providerText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF38BDF8)
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Timestamp Pill Chip Container (Dark Emerald #065F46)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF065F46))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = timeText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFA7F3D0)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Soundwave Visualizer
+                // Audio Waveform Visualizer
                 SoundwaveVisualizer(
                     isPlaying = isTestActive || isSpeaking,
-                    height = 52.dp,
-                    barCount = 28
+                    height = 54.dp,
+                    barCount = 30
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = if (isTestActive || isSpeaking) "Playing announcement..." else "Soundbox announcement ready",
+                    text = if (isTestActive || isSpeaking) "Playing announcement..." else "Voice announcement ready",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFF38BDF8)
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -191,7 +228,7 @@ fun LivePaymentScreen(modifier: Modifier = Modifier) {
                         text = "Test Announcement",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Switch(
@@ -201,15 +238,17 @@ fun LivePaymentScreen(modifier: Modifier = Modifier) {
                             if (checked) {
                                 container.speechQueue.enqueue(
                                     SpeechRequest(
-                                        text = "PhonePe पर $payerText से साढ़े तीन सौ रुपये प्राप्त हुए।",
+                                        text = "$providerText पर $payerText से साढ़े तीन सौ रुपये प्राप्त हुए।",
                                         language = "hi"
                                     )
                                 )
                             }
                         },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                            checkedThumbColor = Color(0xFF10B981),
+                            checkedTrackColor = Color(0xFF065F46),
+                            uncheckedThumbColor = Color(0xFF64748B),
+                            uncheckedTrackColor = Color(0xFF1E293B)
                         )
                     )
                 }

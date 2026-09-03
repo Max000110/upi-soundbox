@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            val themeName = settings?.themeVariant ?: "OCEAN_BLUE"
+            val themeName = settings?.themeVariant ?: "DARK_NAVY"
 
             UpiSoundboxTheme(themeName = themeName) {
                 MainApp()
@@ -127,7 +127,11 @@ fun MainApp() {
                     onOpenSettings = { navController.navigate(Screen.Settings.route) }
                 )
             }
-            composable(Screen.LivePayment.route) { LivePaymentScreen() }
+            composable(Screen.LivePayment.route) {
+                LivePaymentScreen(
+                    onNavigateBack = { navController.navigate(Screen.Home.route) }
+                )
+            }
             composable(Screen.History.route) { HistoryScreen() }
             composable(Screen.Voice.route) { VoiceScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }
