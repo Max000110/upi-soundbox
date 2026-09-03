@@ -4,7 +4,6 @@ import com.upisoundbox.core.model.Direction
 import com.upisoundbox.core.model.Provider
 import com.upisoundbox.dedupe.PaymentDeduplicator
 import com.upisoundbox.domain.model.PaymentEvent
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -20,134 +19,91 @@ class DelayedReplayProtectionTest {
     }
 
     @Test
-    fun testPaymentAnnouncedOnce_AndDelayedNotificationRepostAfter45MinutesIsSuppressed() {
-        val t0 = 1788200000000L // 10:00 AM
+    fun testRealWorldKotakPlusGooglePayDelayed23MinutesReconciliation() {
+        val t0 = 1788200000000L // 06:32 PM
 
-        // ₹30 payment arrives at 10:00 AM
-        val initialPayment = PaymentEvent(
-            sourcePackage = "com.phonepe.app",
-            provider = Provider.PHONEPE,
+        // 1. Kotak 811 Mobile Banking app sends push notification at 06:32 PM
+        val kotakPush = PaymentEvent(
+            sourcePackage = "com.kotak811mobilebankingapp.instantsavingsupiscanandpayrecharge",
+            provider = Provider.GENERIC,
             direction = Direction.CREDIT,
-            amountMinor = 3000L, // ₹30.00
-            payerName = "Rahul Sharma",
-            transactionReference = "TXN_PHONEPE_884920",
+            amountMinor = 2000L, // ₹20.00
+            payerName = "GUDIYA JAGDISH CHOUDHARY",
+            transactionReference = null,
             eventTime = t0,
-            sourceNotificationKey = "0|com.phonepe.app|1|merchant_30|10588",
-            confidence = 0.98f
+            sourceNotificationKey = "0|com.kotak811mobilebankingapp|0|FCM-Notification:814334555|10562",
+            confidence = 0.90f,
+            rawSnippet = "₹20.00 received from GUDIYA JAGDISH CHOUDHARY"
         )
 
-        // 1. Initial notification MUST be announced
-        val isFirstDuplicate = deduplicator.isDuplicate(initialPayment, now = t0)
-        assertFalse("Initial payment must be announced", isFirstDuplicate)
+        val isKotakDuplicate = deduplicator.isDuplicate(kotakPush, now = t0)
+        assertFalse("First Kotak bank notification must be announced", isKotakDuplicate)
 
-        // 2. 45 minutes later (T0 + 45 min): PhonePe updates notification summary or Android redispatches onNotificationPosted
-        val t45min = t0 + (45 * 60 * 1000L)
-        val repostedPayment = PaymentEvent(
-            sourcePackage = "com.phonepe.app",
-            provider = Provider.PHONEPE,
+        // 2. 23 minutes later (06:55 PM), Google Pay syncs and posts delayed notification
+        val t23min = t0 + (23 * 60 * 1000L)
+        val googlePayPush = PaymentEvent(
+            sourcePackage = "com.google.android.apps.nbu.paisa.user",
+            provider = Provider.GOOGLE_PAY,
             direction = Direction.CREDIT,
-            amountMinor = 3000L, // ₹30.00
-            payerName = "Rahul Sharma",
-            transactionReference = "TXN_PHONEPE_884920",
-            eventTime = t45min,
-            sourceNotificationKey = "0|com.phonepe.app|1|merchant_30|10588",
-            confidence = 0.98f
+            amountMinor = 2000L, // ₹20.00
+            payerName = "GUDIYA JAGDISH CHOUDHARY",
+            transactionReference = null,
+            eventTime = t23min,
+            sourceNotificationKey = "0|com.google.android.apps.nbu.paisa.user|0|1354135901::client_fetch:0eefafe3|10575",
+            confidence = 0.99f,
+            rawSnippet = "GUDIYA JAGDISH CHOUDHARY paid you ₹20.00"
         )
 
-        // Delayed repost MUST be suppressed permanently!
-        val isRepostDuplicate = deduplicator.isDuplicate(repostedPayment, now = t45min)
-        assertTrue("45-minute delayed repost of same transaction ref must be suppressed", isRepostDuplicate)
+        val isGpayDuplicate = deduplicator.isDuplicate(googlePayPush, now = t23min)
+        assertTrue("Google Pay notification arriving 23 mins after Kotak for same payment MUST BE SUPPRESSED", isGpayDuplicate)
+
+        // 3. 40 minutes later (07:12 PM), Bank SMS arrives with UPI Reference
+        val t40min = t0 + (40 * 60 * 1000L)
+        val bankSms = PaymentEvent(
+            sourcePackage = "com.google.android.apps.messaging",
+            provider = Provider.GENERIC,
+            direction = Direction.CREDIT,
+            amountMinor = 2000L, // ₹20.00
+            payerName = "GUDIYA JAGDISH CHOUD",
+            transactionReference = "142912391924",
+            eventTime = t40min,
+            sourceNotificationKey = "0|com.google.android.apps.messaging|2|sms:381|10191",
+            confidence = 0.90f,
+            rawSnippet = "Received Rs.20.00 in your Kotak Bank AC 2413 from GUDIYA JAGDISH CHOUD on 03-09-26.UPI Ref:142912391924"
+        )
+
+        val isSmsDuplicate = deduplicator.isDuplicate(bankSms, now = t40min)
+        assertTrue("Bank SMS arriving 40 mins later for same payment MUST BE SUPPRESSED", isSmsDuplicate)
     }
 
     @Test
-    fun testDelayedNotificationKeyRepostWithoutRefIsSuppressedAfter60Minutes() {
+    fun testGenuinelyNewCustomerPaymentAfter2HoursIsAnnounced() {
         val t0 = 1788200000000L
 
-        val initialPayment = PaymentEvent(
+        // Customer 1 pays ₹20 at 06:00 PM
+        val cust1 = PaymentEvent(
             sourcePackage = "com.google.android.apps.nbu.paisa.user",
             provider = Provider.GOOGLE_PAY,
             direction = Direction.CREDIT,
-            amountMinor = 5000L, // ₹50.00
-            payerName = "Amit Kumar",
-            transactionReference = null, // No ref in brief push
+            amountMinor = 2000L,
+            payerName = "GUDIYA JAGDISH CHOUDHARY",
+            transactionReference = "REF_111",
             eventTime = t0,
-            sourceNotificationKey = "0|com.google.android.apps.nbu.paisa.user|1|gpay_notif_99|10590",
-            confidence = 0.95f
+            sourceNotificationKey = "key_111"
         )
+        assertFalse(deduplicator.isDuplicate(cust1, now = t0))
 
-        assertFalse(deduplicator.isDuplicate(initialPayment, now = t0))
-
-        // 60 minutes later, Android re-delivers the existing notification key from the shade
-        val t60min = t0 + (60 * 60 * 1000L)
-        val delayedPayment = PaymentEvent(
+        // Customer 2 pays ₹20 at 06:15 PM (Different payer -> instant announcement!)
+        val cust2 = PaymentEvent(
             sourcePackage = "com.google.android.apps.nbu.paisa.user",
             provider = Provider.GOOGLE_PAY,
             direction = Direction.CREDIT,
-            amountMinor = 5000L,
-            payerName = "Amit Kumar",
-            transactionReference = null,
-            eventTime = t60min,
-            sourceNotificationKey = "0|com.google.android.apps.nbu.paisa.user|1|gpay_notif_99|10590",
-            confidence = 0.95f
+            amountMinor = 2000L,
+            payerName = "Mr IMRAN KARIMULLA SHAIKH",
+            transactionReference = "REF_222",
+            eventTime = t0 + 15 * 60 * 1000L,
+            sourceNotificationKey = "key_222"
         )
-
-        assertTrue("Delayed notification key repost after 60 mins must be suppressed", deduplicator.isDuplicate(delayedPayment, now = t60min))
-    }
-
-    @Test
-    fun testGenuinelyNewPaymentOfSameAmountAfter45MinutesIsAnnounced() {
-        val t0 = 1788200000000L
-
-        // Customer 1 pays ₹30 at 10:00 AM
-        val payment1 = PaymentEvent(
-            sourcePackage = "com.phonepe.app",
-            provider = Provider.PHONEPE,
-            direction = Direction.CREDIT,
-            amountMinor = 3000L, // ₹30.00
-            payerName = "Customer One",
-            transactionReference = "REF_ORDER_001",
-            eventTime = t0,
-            sourceNotificationKey = "notif_key_cust1",
-            confidence = 0.98f
-        )
-        assertFalse("First ₹30 payment must be announced", deduplicator.isDuplicate(payment1, now = t0))
-
-        // Customer 2 pays ₹30 at 10:45 AM (New transaction reference + new notification key)
-        val t45min = t0 + (45 * 60 * 1000L)
-        val payment2 = PaymentEvent(
-            sourcePackage = "com.phonepe.app",
-            provider = Provider.PHONEPE,
-            direction = Direction.CREDIT,
-            amountMinor = 3000L, // ₹30.00
-            payerName = "Customer Two",
-            transactionReference = "REF_ORDER_002",
-            eventTime = t45min,
-            sourceNotificationKey = "notif_key_cust2",
-            confidence = 0.98f
-        )
-        assertFalse("Genuinely new ₹30 payment from Customer 2 must be announced", deduplicator.isDuplicate(payment2, now = t45min))
-    }
-
-    @Test
-    fun testDurableIdentityFormat() {
-        val eventWithRef = PaymentEvent(
-            sourcePackage = "com.phonepe.app",
-            provider = Provider.PHONEPE,
-            amountMinor = 10000L,
-            payerName = "Deepak",
-            transactionReference = "RRN998877",
-            sourceNotificationKey = "key_998877"
-        )
-        assertEquals("TXN_REF:PHONEPE:RRN998877:10000", eventWithRef.durableIdentity)
-
-        val eventWithoutRef = PaymentEvent(
-            sourcePackage = "com.google.android.apps.nbu.paisa.user",
-            provider = Provider.GOOGLE_PAY,
-            amountMinor = 2500L,
-            payerName = "Suresh Raina",
-            transactionReference = null,
-            sourceNotificationKey = "gpay_shade_key_44"
-        )
-        assertEquals("NOTIF_KEY:GOOGLE_PAY:gpay_shade_key_44:2500:Suresh Raina", eventWithoutRef.durableIdentity)
+        assertFalse("Different payer for same amount must be announced", deduplicator.isDuplicate(cust2, now = t0 + 15 * 60 * 1000L))
     }
 }

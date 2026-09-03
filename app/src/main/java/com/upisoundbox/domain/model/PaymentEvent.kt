@@ -58,16 +58,21 @@ data class PaymentEvent(
         ): String {
             val cleanRef = transactionReference?.trim()?.takeIf { it.isNotEmpty() }
             if (cleanRef != null) {
-                return "TXN_REF:${provider.name}:${cleanRef}:${amountMinor}"
+                // Universal reference across Bank SMS, Google Pay, PhonePe, Paytm
+                return "TXN_REF:${cleanRef}:${amountMinor}"
+            }
+
+            val cleanPayerName = cleanPayer(payerName)
+            if (cleanPayerName != null) {
+                return "PAYER_AMT:${cleanPayerName.lowercase()}:${amountMinor}"
             }
 
             val cleanKey = sourceNotificationKey?.trim()?.takeIf { it.isNotEmpty() }
-            val cleanPayerName = cleanPayer(payerName) ?: "UNKNOWN"
             if (cleanKey != null) {
-                return "NOTIF_KEY:${provider.name}:${cleanKey}:${amountMinor}:${cleanPayerName}"
+                return "NOTIF_KEY:${cleanKey}:${amountMinor}"
             }
 
-            return "SEMANTIC:${provider.name}:${amountMinor}:${cleanPayerName}"
+            return "SEMANTIC:${provider.name}:${amountMinor}:${System.currentTimeMillis() / 60000}"
         }
     }
 }

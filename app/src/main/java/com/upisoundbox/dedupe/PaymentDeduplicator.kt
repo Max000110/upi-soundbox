@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.abs
 
 class PaymentDeduplicator(
     private val context: Context? = null,
@@ -17,6 +18,7 @@ class PaymentDeduplicator(
 ) {
     data class CachedPayment(
         val durableIdentity: String,
+        val sourcePackage: String,
         val notificationKey: String?,
         val transactionReference: String?,
         val amountMinor: Long,
@@ -77,12 +79,13 @@ class PaymentDeduplicator(
     }
 
     /**
-     * Checks if the event is a duplicate using a 5-layer defence:
-     * 1. Durable History Store (persisted on disk across app lifecycles)
-     * 2. Persistent Durable Identity Cache
-     * 3. Persistent Transaction Reference (RRN / UPI Ref) Cache
-     * 4. Persistent Notification Key Cache (Android status bar reposts)
-     * 5. In-Memory Sliding Window for cross-provider simultaneous bursts (Bank SMS vs App Push)
+     * Checks if the event is a duplicate using cross-provider multi-app reconciliation:
+     * 1. Durable History Store (persisted on disk across app lifecycles and cross-app reconciliation)
+     * 2. Universal Transaction Reference (RRN / UPI Ref) Cache (universal across Bank SMS & Apps)
+     * 3. Direct Notification Key Cache (Android status bar update/reposts)
+     * 4. Multi-App Reconciliation:
+     *    - Different packages (Bank App vs Google Pay / PhonePe): Reconciled across 2-hour window
+     *    - Same package (Multiple payments in same app): Separated by configured windowSeconds
      */
     @Synchronized
     fun isDuplicate(
@@ -99,14 +102,7 @@ class PaymentDeduplicator(
             return true
         }
 
-        // 2. LAYER 2: Exact Durable Identity Match
-        if (seenDurableIdentities.containsKey(event.durableIdentity)) {
-            Log.w("UpiSoundbox", "Deduplicator: Suppressed duplicate via seen durableIdentity: ${event.durableIdentity}")
-            recordKeysOnly(event, now)
-            return true
-        }
-
-        // 3. LAYER 3: Exact Transaction Reference / UPI Ref / RRN Match
+        // 2. LAYER 2: Universal Transaction Reference Match (Bank SMS / RRN)
         val cleanRef = event.transactionReference?.trim()?.takeIf { it.isNotEmpty() }
         if (cleanRef != null) {
             val refTime = seenReferences[cleanRef]
@@ -117,7 +113,7 @@ class PaymentDeduplicator(
             }
         }
 
-        // 4. LAYER 4: Direct Notification Key Match (Android notification update/re-post)
+        // 3. LAYER 3: Direct Notification Key Match (Android status bar update/re-post)
         val cleanKey = event.sourceNotificationKey?.trim()?.takeIf { it.isNotEmpty() }
         if (cleanKey != null) {
             val keyTime = seenNotificationKeys[cleanKey]
@@ -128,17 +124,26 @@ class PaymentDeduplicator(
             }
         }
 
-        // 5. LAYER 5: Cross-Provider Semantic Match within sliding window (Bank SMS + App Push burst)
-        val windowMillis = windowSeconds * 1000L
+        // 4. LAYER 4: Cross-App & Same-App Semantic Matching
         val cleanPayer = PaymentEvent.cleanPayer(event.payerName)
+        val sameAppWindowMillis = windowSeconds * 1000L
+        val crossAppWindowMillis = 2 * 3600 * 1000L // 2 hours for Bank App + UPI App delayed pairs
 
         for (cached in recentPayments) {
-            val elapsed = now - cached.timestamp
-            if (elapsed in 0..windowMillis) {
-                if (cached.amountMinor == event.amountMinor) {
-                    val payerMatch = arePayersMatching(cached.cleanPayer, cleanPayer)
-                    if (payerMatch) {
-                        Log.w("UpiSoundbox", "Deduplicator: Suppressed cross-provider burst duplicate (${event.amountMajorFormatted} from $cleanPayer)")
+            if (cached.amountMinor == event.amountMinor) {
+                val payerMatch = arePayersMatching(cached.cleanPayer, cleanPayer)
+                if (payerMatch) {
+                    val timeDiff = abs(now - cached.timestamp)
+                    val isDifferentApp = cached.sourcePackage != event.sourcePackage
+
+                    if (isDifferentApp && timeDiff < crossAppWindowMillis) {
+                        // Different app reporting same payment (e.g. Kotak Bank Push + Google Pay Push)
+                        Log.w("UpiSoundbox", "Deduplicator: Suppressed cross-app duplicate (${event.amountMajorFormatted} from $cleanPayer within ${timeDiff / 1000}s)")
+                        recordKeysOnly(event, now)
+                        return true
+                    } else if (!isDifferentApp && timeDiff < sameAppWindowMillis) {
+                        // Same app rapid burst duplicate
+                        Log.w("UpiSoundbox", "Deduplicator: Suppressed same-app burst duplicate (${event.amountMajorFormatted} from $cleanPayer within ${timeDiff / 1000}s)")
                         recordKeysOnly(event, now)
                         return true
                     }
@@ -158,6 +163,7 @@ class PaymentDeduplicator(
         recentPayments.add(
             CachedPayment(
                 durableIdentity = event.durableIdentity,
+                sourcePackage = event.sourcePackage,
                 notificationKey = cleanKey,
                 transactionReference = cleanRef,
                 amountMinor = event.amountMinor,
@@ -185,21 +191,19 @@ class PaymentDeduplicator(
 
     private fun arePayersMatching(p1: String?, p2: String?): Boolean {
         if (p1.isNullOrBlank() && p2.isNullOrBlank()) return true
-        if (p1.isNullOrBlank() || p2.isNullOrBlank()) {
-            return true
-        }
+        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return true
 
-        val s1 = p1.lowercase().trim()
-        val s2 = p2.lowercase().trim()
+        val s1 = PaymentEvent.cleanPayer(p1)?.lowercase() ?: ""
+        val s2 = PaymentEvent.cleanPayer(p2)?.lowercase() ?: ""
 
+        if (s1.isEmpty() || s2.isEmpty()) return true
         return s1 == s2 || s1.contains(s2) || s2.contains(s1)
     }
 
     private fun cleanupExpired(now: Long) {
-        val burstThreshold = now - (windowSeconds * 1000L)
+        val burstThreshold = now - (2 * 3600 * 1000L)
         recentPayments.removeIf { it.timestamp < burstThreshold }
 
-        // Long-term cache cleanup after 7 days
         val longTermThreshold = now - (7 * 24 * 3600 * 1000L)
         seenDurableIdentities.entries.removeIf { it.value < longTermThreshold }
         seenReferences.entries.removeIf { it.value < longTermThreshold }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import kotlin.math.abs
 
 class HistoryRepository(
     private val context: Context,
@@ -38,7 +39,7 @@ class HistoryRepository(
 
         return try {
             val array = JSONArray(jsonStr)
-            val list = mutableListOf<PaymentEvent>()
+            val rawList = mutableListOf<PaymentEvent>()
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 val provider = try { Provider.valueOf(obj.getString("provider")) } catch (e: Exception) { Provider.GENERIC }
@@ -51,18 +52,13 @@ class HistoryRepository(
                 val confidence = obj.optDouble("confidence", 0.95).toFloat()
                 val rawSnippet = obj.optString("rawSnippet", "")
 
-                // Migration / Backward Compatibility: derive durableIdentity and announcementState if missing
-                val durableId = if (obj.has("durableIdentity") && !obj.isNull("durableIdentity") && obj.getString("durableIdentity").isNotBlank()) {
-                    obj.getString("durableIdentity")
-                } else {
-                    PaymentEvent.generateDurableIdentity(
-                        provider = provider,
-                        amountMinor = amountMinor,
-                        payerName = payerName,
-                        transactionReference = transactionReference,
-                        sourceNotificationKey = sourceNotificationKey
-                    )
-                }
+                val durableId = PaymentEvent.generateDurableIdentity(
+                    provider = provider,
+                    amountMinor = amountMinor,
+                    payerName = payerName,
+                    transactionReference = transactionReference,
+                    sourceNotificationKey = sourceNotificationKey
+                )
 
                 val annState = if (obj.has("announcementState") && !obj.isNull("announcementState")) {
                     try { AnnouncementState.valueOf(obj.getString("announcementState")) } catch (e: Exception) { AnnouncementState.ANNOUNCED }
@@ -72,7 +68,7 @@ class HistoryRepository(
 
                 val annAt = obj.optLong("announcedAt", eventTime)
 
-                list.add(
+                rawList.add(
                     PaymentEvent(
                         id = obj.optString("id", java.util.UUID.randomUUID().toString()),
                         sourcePackage = obj.optString("sourcePackage", "com.google.android.apps.nbu.paisa.user"),
@@ -92,7 +88,30 @@ class HistoryRepository(
                     )
                 )
             }
-            list
+
+            // Deduplicate historical list: merge identical (payer + amount within 2h) Bank/UPI pairs
+            val cleanList = mutableListOf<PaymentEvent>()
+            for (item in rawList) {
+                val isDuplicateOfExisting = cleanList.any { existing ->
+                    if (existing.amountMinor != item.amountMinor) return@any false
+                    if (!item.transactionReference.isNullOrBlank() && !existing.transactionReference.isNullOrBlank()) {
+                        return@any existing.transactionReference.equals(item.transactionReference, ignoreCase = true)
+                    }
+                    val payerMatch = arePayersMatching(existing.payerName, item.payerName)
+                    val timeDiff = abs(existing.eventTime - item.eventTime)
+                    payerMatch && (timeDiff < 2 * 3600 * 1000L)
+                }
+                if (!isDuplicateOfExisting) {
+                    cleanList.add(item)
+                }
+            }
+
+            if (cleanList.size != rawList.size) {
+                saveToDiskAsync(cleanList)
+                Log.i("UpiSoundbox", "Cleaned up historical duplicates: ${rawList.size} -> ${cleanList.size} unique transactions")
+            }
+
+            cleanList
         } catch (e: Exception) {
             Log.e("UpiSoundbox", "Error loading persisted payment history", e)
             emptyList()
@@ -130,8 +149,8 @@ class HistoryRepository(
     }
 
     /**
-     * Checks whether an event matching the given durable identity, transaction reference,
-     * or source notification key has already been marked ANNOUNCED in persistent storage.
+     * Checks whether an event matching the transaction reference, notification key,
+     * or cross-provider payer+amount pair has already been announced.
      */
     fun isAlreadyAnnounced(event: PaymentEvent): Boolean {
         synchronized(lock) {
@@ -142,30 +161,33 @@ class HistoryRepository(
             for (stored in list) {
                 if (stored.announcementState != AnnouncementState.ANNOUNCED) continue
 
-                // 1. Exact Durable Identity Match
-                if (stored.durableIdentity == event.durableIdentity) {
-                    Log.d("UpiSoundbox", "isAlreadyAnnounced: Match by durableIdentity: ${event.durableIdentity}")
-                    return true
-                }
-
-                // 2. Exact Transaction Reference Match (across providers / SMS / App)
+                // 1. Exact Transaction Reference Match (Cross-Provider & Bank SMS)
                 if (cleanRef != null && !stored.transactionReference.isNullOrBlank()) {
                     if (stored.transactionReference.trim().equals(cleanRef, ignoreCase = true) &&
-                        stored.amountMinor == event.amountMinor &&
-                        stored.provider == event.provider
+                        stored.amountMinor == event.amountMinor
                     ) {
-                        Log.d("UpiSoundbox", "isAlreadyAnnounced: Match by transactionReference: $cleanRef")
+                        Log.w("UpiSoundbox", "isAlreadyAnnounced: Suppressed by global transaction reference match: $cleanRef")
                         return true
                     }
                 }
 
-                // 3. Exact Source Notification Key Match
+                // 2. Exact Notification Key Match
                 if (cleanKey != null && !stored.sourceNotificationKey.isNullOrBlank()) {
                     if (stored.sourceNotificationKey.trim() == cleanKey &&
-                        stored.amountMinor == event.amountMinor &&
-                        stored.provider == event.provider
+                        stored.amountMinor == event.amountMinor
                     ) {
-                        Log.d("UpiSoundbox", "isAlreadyAnnounced: Match by sourceNotificationKey: $cleanKey")
+                        Log.w("UpiSoundbox", "isAlreadyAnnounced: Suppressed by exact notification key match: $cleanKey")
+                        return true
+                    }
+                }
+
+                // 3. Cross-Provider Multi-App Reconciliation Match (Bank Push vs Google Pay/PhonePe/Paytm Push)
+                if (stored.amountMinor == event.amountMinor) {
+                    val payerMatch = arePayersMatching(stored.payerName, event.payerName)
+                    val timeDiff = abs(event.eventTime - stored.eventTime)
+
+                    if (payerMatch && timeDiff < 2 * 3600 * 1000L) {
+                        Log.w("UpiSoundbox", "isAlreadyAnnounced: Suppressed cross-provider duplicate payment (${event.amountMajorFormatted} from ${event.payerName ?: "Customer"} within ${timeDiff / 1000}s)")
                         return true
                     }
                 }
@@ -174,16 +196,31 @@ class HistoryRepository(
         }
     }
 
+    private fun arePayersMatching(p1: String?, p2: String?): Boolean {
+        if (p1.isNullOrBlank() && p2.isNullOrBlank()) return true
+        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return true
+
+        val s1 = PaymentEvent.cleanPayer(p1)?.lowercase() ?: ""
+        val s2 = PaymentEvent.cleanPayer(p2)?.lowercase() ?: ""
+
+        if (s1.isEmpty() || s2.isEmpty()) return true
+        return s1 == s2 || s1.contains(s2) || s2.contains(s1)
+    }
+
     /**
      * Atomically records an event into history marked as ANNOUNCED and saves to persistent storage.
      */
     fun recordAndMarkAnnounced(event: PaymentEvent) {
         synchronized(lock) {
             val current = _history.value.toMutableList()
-            // Check if already in list to avoid duplicates in list
             val existingIndex = current.indexOfFirst {
-                it.durableIdentity == event.durableIdentity ||
-                (!event.transactionReference.isNullOrBlank() && it.transactionReference.equals(event.transactionReference, ignoreCase = true))
+                if (it.amountMinor != event.amountMinor) return@indexOfFirst false
+                if (!event.transactionReference.isNullOrBlank() && !it.transactionReference.isNullOrBlank()) {
+                    return@indexOfFirst it.transactionReference.equals(event.transactionReference, ignoreCase = true)
+                }
+                val payerMatch = arePayersMatching(it.payerName, event.payerName)
+                val timeDiff = abs(it.eventTime - event.eventTime)
+                payerMatch && (timeDiff < 2 * 3600 * 1000L)
             }
 
             val announcedEvent = event.copy(
@@ -192,7 +229,19 @@ class HistoryRepository(
             )
 
             if (existingIndex >= 0) {
-                current[existingIndex] = announcedEvent
+                // If existing record was generic (Bank SMS / Bank Push) and new one has specific provider, upgrade provider info
+                val existing = current[existingIndex]
+                val bestProvider = if (existing.provider == Provider.GENERIC && event.provider != Provider.GENERIC) {
+                    event.provider
+                } else {
+                    existing.provider
+                }
+                current[existingIndex] = existing.copy(
+                    provider = bestProvider,
+                    transactionReference = existing.transactionReference ?: event.transactionReference,
+                    announcementState = AnnouncementState.ANNOUNCED,
+                    announcedAt = System.currentTimeMillis()
+                )
             } else {
                 current.add(0, announcedEvent)
                 if (current.size > 200) {
@@ -202,7 +251,7 @@ class HistoryRepository(
 
             _history.value = current
             saveToDiskAsync(current)
-            Log.i("UpiSoundbox", "recordAndMarkAnnounced: Persisted event ${announcedEvent.amountMajorFormatted} (durableId=${announcedEvent.durableIdentity})")
+            Log.i("UpiSoundbox", "recordAndMarkAnnounced: Persisted event ${announcedEvent.amountMajorFormatted} (${announcedEvent.provider.displayName} from ${announcedEvent.payerName})")
         }
     }
 
