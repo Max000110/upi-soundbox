@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -46,13 +50,16 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun DiagnosticsScreen(modifier: Modifier = Modifier) {
+fun DiagnosticsScreen(
+    onNavigateBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val container = UpiSoundboxApp.instance.container
 
     val listenerState by container.diagnosticsRepository.listenerState.collectAsState()
     val events by container.diagnosticsRepository.diagnosticEvents.collectAsState()
-    val ttsStatus by (container.ttsEngine as com.upisoundbox.speech.AndroidTtsEngine).status.collectAsState()
+    val ttsStatus by container.ttsEngine.status.collectAsState()
     val isAccessGranted = NotificationAccessChecker.isAccessGranted(context)
     val isDeviceRooted = SecurityManager.isDeviceRooted()
     val isBatteryUnrestricted = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
@@ -63,11 +70,24 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
             .padding(horizontal = 20.dp)
     ) {
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "System Diagnostics",
-            style = MaterialTheme.typography.headlineLarge,
-            color = TextPrimary
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (onNavigateBack != null) {
+                IconButton(onClick = { onNavigateBack.invoke() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary
+                    )
+                }
+            }
+            Text(
+                text = "System Diagnostics",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Diagnostic summary card

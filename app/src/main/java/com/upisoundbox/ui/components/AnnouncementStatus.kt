@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,7 +49,7 @@ fun AnnouncementStatus(
     val icon = when {
         isSuccess -> Icons.Default.CheckCircle
         isError -> Icons.Default.ErrorOutline
-        else -> Icons.Default.VolumeUp
+        else -> Icons.AutoMirrored.Filled.VolumeUp
     }
 
     val text = when (state) {

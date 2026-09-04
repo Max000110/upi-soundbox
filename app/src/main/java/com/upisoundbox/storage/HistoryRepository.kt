@@ -18,9 +18,11 @@ import org.json.JSONObject
 import java.util.Calendar
 import kotlin.math.abs
 
+import kotlinx.coroutines.SupervisorJob
+
 class HistoryRepository(
     private val context: Context,
-    private val ioScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val ioScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) {
 
     private val prefs = context.getSharedPreferences("upi_payment_history_store", Context.MODE_PRIVATE)
@@ -41,52 +43,56 @@ class HistoryRepository(
             val array = JSONArray(jsonStr)
             val rawList = mutableListOf<PaymentEvent>()
             for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val provider = try { Provider.valueOf(obj.getString("provider")) } catch (e: Exception) { Provider.GENERIC }
-                val direction = try { Direction.valueOf(obj.getString("direction")) } catch (e: Exception) { Direction.CREDIT }
-                val amountMinor = obj.optLong("amountMinor", 100L)
-                val payerName = if (obj.has("payerName") && !obj.isNull("payerName")) obj.getString("payerName") else null
-                val transactionReference = if (obj.has("transactionReference") && !obj.isNull("transactionReference")) obj.getString("transactionReference") else null
-                val eventTime = obj.optLong("eventTime", System.currentTimeMillis())
-                val sourceNotificationKey = obj.optString("sourceNotificationKey", "")
-                val confidence = obj.optDouble("confidence", 0.95).toFloat()
-                val rawSnippet = obj.optString("rawSnippet", "")
+                try {
+                    val obj = array.getJSONObject(i)
+                    val provider = try { Provider.valueOf(obj.getString("provider")) } catch (e: Exception) { Provider.GENERIC }
+                    val direction = try { Direction.valueOf(obj.getString("direction")) } catch (e: Exception) { Direction.CREDIT }
+                    val amountMinor = obj.optLong("amountMinor", 100L)
+                    val payerName = if (obj.has("payerName") && !obj.isNull("payerName")) obj.getString("payerName") else null
+                    val transactionReference = if (obj.has("transactionReference") && !obj.isNull("transactionReference")) obj.getString("transactionReference") else null
+                    val eventTime = obj.optLong("eventTime", System.currentTimeMillis())
+                    val sourceNotificationKey = obj.optString("sourceNotificationKey", "")
+                    val confidence = obj.optDouble("confidence", 0.95).toFloat()
+                    val rawSnippet = obj.optString("rawSnippet", "")
 
-                val durableId = PaymentEvent.generateDurableIdentity(
-                    provider = provider,
-                    amountMinor = amountMinor,
-                    payerName = payerName,
-                    transactionReference = transactionReference,
-                    sourceNotificationKey = sourceNotificationKey
-                )
-
-                val annState = if (obj.has("announcementState") && !obj.isNull("announcementState")) {
-                    try { AnnouncementState.valueOf(obj.getString("announcementState")) } catch (e: Exception) { AnnouncementState.ANNOUNCED }
-                } else {
-                    AnnouncementState.ANNOUNCED
-                }
-
-                val annAt = obj.optLong("announcedAt", eventTime)
-
-                rawList.add(
-                    PaymentEvent(
-                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
-                        sourcePackage = obj.optString("sourcePackage", "com.google.android.apps.nbu.paisa.user"),
+                    val durableId = PaymentEvent.generateDurableIdentity(
                         provider = provider,
-                        direction = direction,
                         amountMinor = amountMinor,
-                        currency = Currency.INR,
                         payerName = payerName,
                         transactionReference = transactionReference,
-                        eventTime = eventTime,
-                        sourceNotificationKey = sourceNotificationKey,
-                        confidence = confidence,
-                        rawSnippet = rawSnippet,
-                        durableIdentity = durableId,
-                        announcementState = annState,
-                        announcedAt = annAt
+                        sourceNotificationKey = sourceNotificationKey
                     )
-                )
+
+                    val annState = if (obj.has("announcementState") && !obj.isNull("announcementState")) {
+                        try { AnnouncementState.valueOf(obj.getString("announcementState")) } catch (e: Exception) { AnnouncementState.ANNOUNCED }
+                    } else {
+                        AnnouncementState.ANNOUNCED
+                    }
+
+                    val annAt = obj.optLong("announcedAt", eventTime)
+
+                    rawList.add(
+                        PaymentEvent(
+                            id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                            sourcePackage = obj.optString("sourcePackage", "com.google.android.apps.nbu.paisa.user"),
+                            provider = provider,
+                            direction = direction,
+                            amountMinor = amountMinor,
+                            currency = Currency.INR,
+                            payerName = payerName,
+                            transactionReference = transactionReference,
+                            eventTime = eventTime,
+                            sourceNotificationKey = sourceNotificationKey,
+                            confidence = confidence,
+                            rawSnippet = rawSnippet,
+                            durableIdentity = durableId,
+                            announcementState = annState,
+                            announcedAt = annAt
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.w("UpiSoundbox", "Skipping corrupted history entry at index $i", e)
+                }
             }
 
             // Deduplicate historical list: merge identical (payer + amount within 2h) Bank/UPI pairs
@@ -198,12 +204,12 @@ class HistoryRepository(
 
     private fun arePayersMatching(p1: String?, p2: String?): Boolean {
         if (p1.isNullOrBlank() && p2.isNullOrBlank()) return true
-        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return true
+        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return false
 
         val s1 = PaymentEvent.cleanPayer(p1)?.lowercase() ?: ""
         val s2 = PaymentEvent.cleanPayer(p2)?.lowercase() ?: ""
 
-        if (s1.isEmpty() || s2.isEmpty()) return true
+        if (s1.isEmpty() || s2.isEmpty()) return false
         return s1 == s2 || s1.contains(s2) || s2.contains(s1)
     }
 

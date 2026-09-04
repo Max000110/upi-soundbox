@@ -329,7 +329,7 @@ fun RecentPaymentTile(
         listOf(Color(0xFF10B981), Color(0xFF059669)),
         listOf(Color(0xFFEC4899), Color(0xFFDB2777))
     )
-    val colorIndex = Math.abs(payerName.hashCode()) % avatarGradients.size
+    val colorIndex = (payerName.hashCode() and 0x7FFFFFFF) % avatarGradients.size
     val gradient = avatarGradients[colorIndex]
 
     Card(

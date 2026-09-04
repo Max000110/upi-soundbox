@@ -59,4 +59,11 @@ class SpeechQueue(
     fun stopCurrent() {
         speechEngine.stop()
     }
+
+    fun clear() {
+        while (channel.tryReceive().isSuccess) {
+            // Drain backlog
+        }
+        speechEngine.stop()
+    }
 }

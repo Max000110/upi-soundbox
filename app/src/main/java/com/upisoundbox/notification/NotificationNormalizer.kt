@@ -16,7 +16,7 @@ object NotificationNormalizer {
     )
 
     private val REGEX_NEWLINES = Regex("[\\r\\n\\t]+")
-    private val REGEX_CURRENCY_MARKERS = Regex("(?i)\\b(rs\\.?|inr)\\b")
+    private val REGEX_CURRENCY_MARKERS = Regex("(?i)\\b(?:rs|inr|re)\\.?(?=[\\s\\d]|$)")
     private val REGEX_COLLAPSE_WHITESPACES = Regex("\\s+")
 
     fun normalize(raw: RawNotification): NormalizedNotification {

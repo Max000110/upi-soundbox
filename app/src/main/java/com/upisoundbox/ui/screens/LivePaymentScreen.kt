@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +60,7 @@ fun LivePaymentScreen(
     val isSpeaking = ttsStatus == TtsStatus.SPEAKING
 
     val latestEvent = history.firstOrNull()
-    var isTestActive by remember { mutableStateOf(false) }
+    var isTestActive by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(ttsStatus) {
         if (ttsStatus == TtsStatus.READY && isTestActive) {

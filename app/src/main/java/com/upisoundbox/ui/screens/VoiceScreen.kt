@@ -31,7 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -254,15 +257,24 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        val speechRate = settings?.speechRate ?: 1.0f
+        val volume = settings?.volume ?: 1.0f
+
+        var localSpeechRate by remember(speechRate) { mutableFloatStateOf(speechRate) }
+        var localVolume by remember(volume) { mutableFloatStateOf(volume) }
+
         // Speech Rate Slider
         Text(
-            text = "Master Speed Adjustment: ${String.format("%.1f", speechRate)}x",
+            text = "Master Speed Adjustment: ${String.format(java.util.Locale.US, "%.1f", localSpeechRate)}x",
             style = MaterialTheme.typography.titleMedium,
             color = TextPrimary
         )
         Slider(
-            value = speechRate,
-            onValueChange = { scope.launch { container.settingsRepository.updateSpeechRate(it) } },
+            value = localSpeechRate,
+            onValueChange = { localSpeechRate = it },
+            onValueChangeFinished = {
+                scope.launch { container.settingsRepository.updateSpeechRate(localSpeechRate) }
+            },
             valueRange = 0.7f..1.5f,
             steps = 7,
             colors = SliderDefaults.colors(thumbColor = PrimaryM3, activeTrackColor = PrimaryM3)
@@ -272,13 +284,16 @@ fun VoiceScreen(modifier: Modifier = Modifier) {
 
         // Volume Slider
         Text(
-            text = "Soundbox Speaker Volume: ${(volume * 100).toInt()}%",
+            text = "Soundbox Speaker Volume: ${(localVolume * 100).toInt()}%",
             style = MaterialTheme.typography.titleMedium,
             color = TextPrimary
         )
         Slider(
-            value = volume,
-            onValueChange = { scope.launch { container.settingsRepository.updateVolume(it) } },
+            value = localVolume,
+            onValueChange = { localVolume = it },
+            onValueChangeFinished = {
+                scope.launch { container.settingsRepository.updateVolume(localVolume) }
+            },
             valueRange = 0.2f..1.0f,
             steps = 7,
             colors = SliderDefaults.colors(thumbColor = PrimaryM3, activeTrackColor = PrimaryM3)

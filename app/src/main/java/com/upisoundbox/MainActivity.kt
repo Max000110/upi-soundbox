@@ -31,6 +31,7 @@ import com.upisoundbox.ui.screens.DiagnosticsScreen
 import com.upisoundbox.ui.screens.HistoryScreen
 import com.upisoundbox.ui.screens.HomeScreen
 import com.upisoundbox.ui.screens.LivePaymentScreen
+import com.upisoundbox.ui.screens.ProvidersScreen
 import com.upisoundbox.ui.screens.SettingsScreen
 import com.upisoundbox.ui.screens.VoiceScreen
 import com.upisoundbox.ui.theme.UpiSoundboxTheme
@@ -134,8 +135,22 @@ fun MainApp() {
             }
             composable(Screen.History.route) { HistoryScreen() }
             composable(Screen.Voice.route) { VoiceScreen() }
-            composable(Screen.Settings.route) { SettingsScreen() }
-            composable(Screen.Diagnostics.route) { DiagnosticsScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateToDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
+                    onNavigateToProviders = { navController.navigate(Screen.Providers.route) }
+                )
+            }
+            composable(Screen.Diagnostics.route) {
+                DiagnosticsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Providers.route) {
+                ProvidersScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

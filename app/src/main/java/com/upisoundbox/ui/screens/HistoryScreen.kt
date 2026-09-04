@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,8 +61,8 @@ fun HistoryScreen(modifier: Modifier = Modifier) {
     val container = UpiSoundboxApp.instance.container
     val history by container.historyRepository.history.collectAsState()
 
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(HistoryFilter.ALL) }
 
     val rawHistory = if (history.isNotEmpty()) history else getMockHistoryList()
 
@@ -232,7 +233,7 @@ fun HistoryItemCard(
         listOf(Color(0xFF0284C7), Color(0xFF0369A1)),
         listOf(Color(0xFFD97706), Color(0xFFB45309))
     )
-    val colorIndex = Math.abs(payerName.hashCode()) % avatarGradients.size
+    val colorIndex = (payerName.hashCode() and 0x7FFFFFFF) % avatarGradients.size
     val gradient = avatarGradients[colorIndex]
 
     Card(

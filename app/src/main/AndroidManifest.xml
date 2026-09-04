@@ -37,7 +37,7 @@
         <!-- Notification Listener Service bound by Android System -->
         <service
             android:name=".notification.UpiNotificationListener"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/notification_listener_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>

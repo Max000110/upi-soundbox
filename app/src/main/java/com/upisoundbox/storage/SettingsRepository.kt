@@ -13,8 +13,11 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.upisoundbox.core.model.Provider
 import com.upisoundbox.domain.model.UserSettings
 import com.upisoundbox.speech.VoicePersona
+import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "upi_soundbox_settings")
 
@@ -40,7 +43,15 @@ class SettingsRepository(private val context: Context) {
         val LED_BLINK_ENABLED = booleanPreferencesKey("led_blink_enabled")
     }
 
-    val settingsFlow: Flow<UserSettings> = context.dataStore.data.map { prefs ->
+    val settingsFlow: Flow<UserSettings> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { prefs ->
         val defaultProviders = Provider.entries.map { it.name }.toSet()
         UserSettings(
             language = prefs[Keys.LANGUAGE] ?: "en",

@@ -35,30 +35,55 @@ object AnnouncementFormatter {
     }
 
     private fun formatEnglish(rupees: Long, paise: Long, payer: String?, provider: Provider?): String {
-        val amountWords = numberToEnglishWords(rupees)
-        val paiseText = if (paise > 0) " and ${numberToEnglishWords(paise)} paise" else ""
-        val currencyWord = if (rupees == 1L && paise == 0L) "rupee" else "rupees"
+        val amountPhrase = when {
+            rupees > 0 && paise > 0 -> {
+                val rWord = if (rupees == 1L) "rupee" else "rupees"
+                val pWord = if (paise == 1L) "paisa" else "paise"
+                "${numberToEnglishWords(rupees)} $rWord and ${numberToEnglishWords(paise)} $pWord"
+            }
+            rupees > 0 -> {
+                val rWord = if (rupees == 1L) "rupee" else "rupees"
+                "${numberToEnglishWords(rupees)} $rWord"
+            }
+            paise > 0 -> {
+                val pWord = if (paise == 1L) "paisa" else "paise"
+                "${numberToEnglishWords(paise)} $pWord"
+            }
+            else -> "zero rupees"
+        }
 
         val payerPart = if (!payer.isNullOrBlank()) " from $payer" else ""
         val providerPart = if (provider != null && provider != Provider.GENERIC) " on ${provider.displayName}" else ""
 
         return if (payerPart.isNotEmpty()) {
-            "Received $amountWords$paiseText $currencyWord$payerPart$providerPart."
+            "Received $amountPhrase$payerPart$providerPart."
         } else if (providerPart.isNotEmpty()) {
-            "$amountWords$paiseText $currencyWord received$providerPart."
+            "$amountPhrase received$providerPart."
         } else {
-            "Payment received. $amountWords$paiseText $currencyWord."
+            "Payment received. $amountPhrase."
         }
     }
 
     private fun formatHindi(rupees: Long, paise: Long, payer: String?, provider: Provider?): String {
-        val amountWords = numberToHindiWords(rupees)
-        val paiseText = if (paise > 0) " ${numberToHindiWords(paise)} पैसे" else ""
+        val (amountPhrase, verb) = when {
+            rupees > 0 && paise > 0 -> {
+                val pWord = if (paise == 1L) "पैसा" else "पैसे"
+                "${numberToHindiWords(rupees)} रुपये ${numberToHindiWords(paise)} $pWord" to "प्राप्त हुए"
+            }
+            rupees > 0 -> {
+                "${numberToHindiWords(rupees)} रुपये" to "प्राप्त हुए"
+            }
+            paise > 0 -> {
+                val pWord = if (paise == 1L) "पैसा" else "पैसे"
+                "${numberToHindiWords(paise)} $pWord" to "प्राप्त हुए"
+            }
+            else -> "शून्य रुपये" to "प्राप्त हुए"
+        }
 
         val payerPart = if (!payer.isNullOrBlank()) "$payer से " else ""
         val providerPart = if (provider != null && provider != Provider.GENERIC) "${provider.displayName} पर " else ""
 
-        return "$providerPart$payerPart$amountWords$paiseText रुपये प्राप्त हुए।"
+        return "$providerPart$payerPart$amountPhrase $verb।"
     }
 
     fun numberToEnglishWords(n: Long): String {

@@ -35,7 +35,7 @@ class AndroidTtsEngine(
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
     private val _status = MutableStateFlow(TtsStatus.UNINITIALIZED)
-    val status: StateFlow<TtsStatus> = _status.asStateFlow()
+    override val status: StateFlow<TtsStatus> = _status.asStateFlow()
 
     private var initDeferred = CompletableDeferred<Boolean>()
     private val initMutex = Mutex()
@@ -280,6 +280,7 @@ class AndroidTtsEngine(
 
         return withTimeoutOrNull(15000L) { completionDeferred.await() } ?: run {
             Log.w("UpiSoundbox", "TTS speech timed out after 15s")
+            _status.value = TtsStatus.READY
             abandonFocus(focusRequest)
             false
         }

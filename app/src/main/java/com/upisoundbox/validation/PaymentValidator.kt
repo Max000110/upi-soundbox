@@ -17,7 +17,15 @@ object PaymentValidator {
         "account balance is",
         "requested money",
         "pay request",
-        "approve request"
+        "approve request",
+        "failed",
+        "declined",
+        "reversed",
+        "unsuccessful",
+        "cancelled",
+        "canceled",
+        "timed out",
+        "mandate"
     )
 
     private val CREDIT_PATTERNS = arrayOf(
@@ -54,8 +62,8 @@ object PaymentValidator {
             }
         }
 
-        // Guard 2: Explicit debit check if text clearly indicates money was paid out
-        if (lowercaseText.contains("you paid") || lowercaseText.contains("paid to ") || lowercaseText.contains("debited from")) {
+        // Guard 2: Explicit debit check if text clearly indicates money was paid out (excluding "paid to you")
+        if (lowercaseText.contains("you paid") || (lowercaseText.contains("paid to ") && !lowercaseText.contains("paid to you")) || lowercaseText.contains("debited from")) {
             return Direction.DEBIT
         }
 

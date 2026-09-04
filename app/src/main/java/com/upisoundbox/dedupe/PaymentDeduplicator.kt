@@ -131,6 +131,12 @@ class PaymentDeduplicator(
 
         for (cached in recentPayments) {
             if (cached.amountMinor == event.amountMinor) {
+                // If both have transaction references and they differ, they are definitely distinct payments!
+                val cachedRef = cached.transactionReference?.trim()?.takeIf { it.isNotEmpty() }
+                if (cleanRef != null && cachedRef != null && cleanRef != cachedRef) {
+                    continue
+                }
+
                 val payerMatch = arePayersMatching(cached.cleanPayer, cleanPayer)
                 if (payerMatch) {
                     val timeDiff = abs(now - cached.timestamp)
@@ -191,12 +197,12 @@ class PaymentDeduplicator(
 
     private fun arePayersMatching(p1: String?, p2: String?): Boolean {
         if (p1.isNullOrBlank() && p2.isNullOrBlank()) return true
-        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return true
+        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return false
 
         val s1 = PaymentEvent.cleanPayer(p1)?.lowercase() ?: ""
         val s2 = PaymentEvent.cleanPayer(p2)?.lowercase() ?: ""
 
-        if (s1.isEmpty() || s2.isEmpty()) return true
+        if (s1.isEmpty() || s2.isEmpty()) return false
         return s1 == s2 || s1.contains(s2) || s2.contains(s1)
     }
 

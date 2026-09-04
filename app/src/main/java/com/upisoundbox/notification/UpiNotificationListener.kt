@@ -28,6 +28,15 @@ class UpiNotificationListener : NotificationListenerService() {
         } catch (e: Exception) {
             Log.e("UpiSoundbox", "Error setting listener disconnected state", e)
         }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            try {
+                Log.i("UpiSoundbox", "Requesting auto-rebind for UpiNotificationListener...")
+                requestRebind(android.content.ComponentName(this, UpiNotificationListener::class.java))
+            } catch (e: Exception) {
+                Log.e("UpiSoundbox", "Failed to request rebind", e)
+            }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
